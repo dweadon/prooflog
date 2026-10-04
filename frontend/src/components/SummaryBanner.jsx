@@ -48,7 +48,12 @@ export default function SummaryBanner({ report, trust, onShowHelp }) {
             </span>{' '}
             {worst.title}.
           </p>
-          {trust.total > 0 && (
+          {report.instant && (
+            <p className="mt-1 text-slate-300">
+              Every finding below was computed directly from your log, and each one links to the exact lines behind it.
+            </p>
+          )}
+          {!report.instant && trust.total > 0 && (
             <p className="mt-1 text-slate-300">
               The AI made {plural(trust.total, 'statement', 'statements')} about them.{' '}
               <span className="font-medium text-emerald-300">{trust.verified} proven by the log ✓</span>
@@ -72,7 +77,7 @@ export default function SummaryBanner({ report, trust, onShowHelp }) {
           <ol className="grid flex-1 gap-2 text-sm text-slate-200 sm:grid-cols-3">
             <li><Step n="1" />Pick a finding from the list<Where> on the <strong>left</strong></Where>.</li>
             <li><Step n="2" />Read what happened in plain English<Where>, in the <strong>middle</strong></Where>.</li>
-            <li><Step n="3" />Click any AI statement to see the exact log lines that prove it<Where>, on the <strong>right</strong></Where>.</li>
+            <li><Step n="3" />Click any {report.instant ? 'fact' : 'AI statement'} to see the exact log lines that prove it<Where>, on the <strong>right</strong></Where>.</li>
           </ol>
           <div className="flex shrink-0 gap-2">
             <button type="button" onClick={onShowHelp} className="rounded-md px-3 py-1.5 text-sm text-emerald-300 hover:bg-emerald-500/10">

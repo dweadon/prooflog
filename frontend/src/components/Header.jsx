@@ -37,7 +37,13 @@ export default function Header({ report, trust, actions, onShowHelp, onHome }) {
               {formatTime(meta.generated_at)}
             </time>
           </div>
-          <TrustBadge verified={trust.verified} total={trust.total} />
+          {report.instant ? (
+            <span className="inline-flex items-center rounded-full bg-sky-500/15 px-3 py-1 text-sm font-medium text-sky-200 ring-1 ring-sky-500/40">
+              Instant scan · no AI · nothing uploaded
+            </span>
+          ) : (
+            <TrustBadge verified={trust.verified} total={trust.total} />
+          )}
         </div>
       )}
     </header>

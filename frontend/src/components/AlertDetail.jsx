@@ -7,7 +7,7 @@ import { ALERT_EXPLAINERS } from '../lib/plain.js'
 // AlertDetail: center panel. The selected alert's title, time range,
 // summary, and the AI's claims about it. Click a claim to see its proof.
 // Keyboard: ↑ / ↓ move between claims, Enter selects, Esc clears the selection.
-export default function AlertDetail({ alert, claims, selectedClaimId, onSelectClaim, onJumpToLine, jumpLine, existingLines }) {
+export default function AlertDetail({ alert, claims, selectedClaimId, onSelectClaim, onJumpToLine, jumpLine, existingLines, instant }) {
   if (!alert) {
     return <p className="p-6 text-slate-400">Pick a finding on the left to see what happened.</p>
   }
@@ -46,10 +46,12 @@ export default function AlertDetail({ alert, claims, selectedClaimId, onSelectCl
 
       <section>
         <h3 className="mb-1 text-xs font-semibold tracking-wider text-slate-400 uppercase">
-          What the AI says ({claims.length})
+          {instant ? 'Facts from your log' : 'What the AI says'} ({claims.length})
         </h3>
         <p className="mb-2 text-sm text-slate-400">
-          Each statement was checked against the log. Click one to see its proof highlighted on the right.
+          {instant
+            ? 'Computed directly from the log by ProofLog’s rules. Click one to see its lines highlighted.'
+            : 'Each statement was checked against the log. Click one to see its proof highlighted on the right.'}
         </p>
         {claims.length ? (
           <ul

@@ -26,8 +26,9 @@ const STEPS = [
 ]
 
 // Landing: the first screen. Explains what ProofLog is and how it works, in
-// plain words, before showing any analysis. On the online demo the main
-// button opens a real example report; locally it lets you check your own log.
+// plain words, before showing any analysis. A big drop zone takes a log file
+// (scanned in the browser online, or analysed by the backend locally); the
+// main button opens the real example report (online) or the last result (locally).
 export default function Landing({ onOpenReport, onUpload, onShowHelp }) {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200">
@@ -54,28 +55,29 @@ export default function Landing({ onOpenReport, onUpload, onShowHelp }) {
           you to take its word for it: <strong className="text-white">every statement points to the exact log lines
           that prove it</strong>, and a separate checker tests each one.
         </p>
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
-          {DEMO_MODE ? (
-            <button type="button" onClick={onOpenReport} className={BIG_PRIMARY}>
-              See a real example report →
-            </button>
-          ) : (
-            <>
-              <FilePickerButton onFile={onUpload} className={BIG_PRIMARY}>
-                Check a log file
-              </FilePickerButton>
-              <button type="button" onClick={onOpenReport} className={BIG_SECONDARY}>
-                See the last result
-              </button>
-            </>
-          )}
+        <FilePickerButton
+          onFile={onUpload}
+          className="mx-auto mt-10 block w-full max-w-2xl rounded-2xl border-2 border-dashed border-slate-600 bg-slate-900/60 px-6 py-10 text-center transition-colors hover:border-emerald-400 hover:bg-emerald-500/5"
+        >
+          <span className="block text-xl font-semibold text-white">Drag a log file here, or click to choose one</span>
+          <span className="mt-2 block text-sm text-slate-400">
+            {DEMO_MODE
+              ? 'Scanned instantly in your browser. Your file never leaves your computer.'
+              : 'ProofLog analyses it with AI and checks every statement against the log.'}
+          </span>
+          <span className="mt-1 block text-xs text-slate-500">SSH login logs, such as /var/log/auth.log on Linux</span>
+        </FilePickerButton>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <button type="button" onClick={onOpenReport} className={BIG_PRIMARY}>
+            {DEMO_MODE ? 'See a real example report →' : 'See the last result →'}
+          </button>
           <a href={EXAMPLE_LOG_URL} download="OpenSSH_2k.log" className={BIG_SECONDARY}>
             Download the example log
           </a>
         </div>
         {DEMO_MODE && (
           <p className="mt-4 text-sm text-slate-400">
-            The example report was made from a real log of a server under attack. No sign-up needed.
+            No log handy? The example report was made from a real log of a server under attack. No sign-up needed.
           </p>
         )}
       </section>

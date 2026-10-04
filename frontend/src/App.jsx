@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { analyzeLog, fetchLatestReport, fetchStatus, readReportFile } from './api.js'
 import { sortBySeverity } from './lib/severity.js'
 import { checkReportIntegrity } from './lib/reportChecks.js'
@@ -16,6 +16,8 @@ import SummaryBanner from './components/SummaryBanner.jsx'
 import HelpDialog from './components/HelpDialog.jsx'
 import DemoBanner from './components/DemoBanner.jsx'
 import Landing from './components/Landing.jsx'
+import DropOverlay from './components/DropOverlay.jsx'
+import { scanFile } from './lib/scan.js'
 import { DEMO_MODE } from './config.js'
 
 // App: holds the current report and what's selected, and lays out the
@@ -33,6 +35,7 @@ export default function App() {
   const [showPrint, setShowPrint] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
   const [view, setView] = useState('landing') // 'landing' first, then 'dashboard'
+  const [dragging, setDragging] = useState(false) // a file is being dragged over the page
   const [progress, setProgress] = useState(null) // backend progress while a log is being checked
 
   // Shared by every way of getting a report: show a busy message,
@@ -77,10 +80,44 @@ export default function App() {
     setView('dashboard')
     if (!report) loadLatest()
   }
-  const uploadFromLanding = (file) => {
+  // Every way of giving ProofLog a log file (buttons, drag-and-drop) ends here.
+  // Online (no backend) the file is scanned instantly in the browser and never
+  // uploaded; with the backend running it gets the full AI analysis.
+  const handleLogFile = (file) => {
     setView('dashboard')
-    uploadLog(file)
+    if (DEMO_MODE) return loadWith(`Scanning ${file.name}…`, () => scanFile(file))
+    return uploadLog(file)
   }
+
+  // Drag-and-drop anywhere on the page, like VirusTotal: drop a log, get results.
+  // The listeners are re-added on every render, so they always see the current state.
+  const busy = Boolean(busyMessage)
+  useEffect(() => {
+    const hasFile = (e) => [...(e.dataTransfer?.types ?? [])].includes('Files')
+    const onOver = (e) => {
+      if (!hasFile(e)) return
+      e.preventDefault()
+      if (!busy) setDragging(true)
+    }
+    const onLeave = (e) => {
+      if (!e.relatedTarget) setDragging(false) // left the browser window
+    }
+    const onDrop = (e) => {
+      if (!hasFile(e)) return
+      e.preventDefault()
+      setDragging(false)
+      const file = e.dataTransfer.files[0]
+      if (file && !busy) handleLogFile(file)
+    }
+    window.addEventListener('dragover', onOver)
+    window.addEventListener('dragleave', onLeave)
+    window.addEventListener('drop', onDrop)
+    return () => {
+      window.removeEventListener('dragover', onOver)
+      window.removeEventListener('dragleave', onLeave)
+      window.removeEventListener('drop', onDrop)
+    }
+  })
 
   const selectAlert = (id) => {
     setSelectedAlertId(id)
@@ -110,8 +147,9 @@ export default function App() {
   if (view === 'landing') {
     return (
       <>
-        <Landing onOpenReport={openReportFromLanding} onUpload={uploadFromLanding} onShowHelp={() => setShowHelp(true)} />
+        <Landing onOpenReport={openReportFromLanding} onUpload={handleLogFile} onShowHelp={() => setShowHelp(true)} />
         {showHelp && <HelpDialog onClose={() => setShowHelp(false)} />}
+        {dragging && <DropOverlay />}
       </>
     )
   }
@@ -131,7 +169,7 @@ export default function App() {
           <Toolbar
             busy={Boolean(busyMessage)}
             hasReport={Boolean(report)}
-            onUpload={uploadLog}
+            onUpload={handleLogFile}
             onLoadLatest={loadLatest}
             onOpenFile={openFile}
             onExport={() => setShowPrint(true)}
@@ -139,13 +177,13 @@ export default function App() {
         }
       />
 
-      {DEMO_MODE && <DemoBanner />}
+      {DEMO_MODE && <DemoBanner report={report} />}
       {report && error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       {checks && <ReportChecks warnings={checks.warnings} />}
       {report && <SummaryBanner report={report} trust={checks.trust} onShowHelp={() => setShowHelp(true)} />}
 
       {!report ? (
-        busyMessage ? null : <EmptyState error={error} onUpload={uploadLog} onShowHelp={() => setShowHelp(true)} />
+        busyMessage ? null : <EmptyState error={error} onUpload={handleLogFile} onShowHelp={() => setShowHelp(true)} />
       ) : (
         <main className="flex flex-col lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[260px_minmax(0,1fr)_minmax(0,1.15fr)]">
           <div className="border-b border-slate-800 lg:min-h-0 lg:overflow-y-auto lg:border-r lg:border-b-0">
@@ -164,6 +202,7 @@ export default function App() {
               onJumpToLine={jumpToLine}
               jumpLine={jumpTarget?.line}
               existingLines={existingLines}
+              instant={Boolean(report.instant)}
             />
           </div>
           <div className="h-[75vh] bg-slate-900/40 lg:h-auto lg:min-h-0">
@@ -180,6 +219,7 @@ export default function App() {
 
       {busyMessage && <BusyOverlay message={busyMessage} progress={progress} />}
       {showHelp && <HelpDialog onClose={() => setShowHelp(false)} />}
+      {dragging && <DropOverlay />}
     </div>
   )
 }

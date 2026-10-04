@@ -1,5 +1,6 @@
 import FilePickerButton from './FilePickerButton.jsx'
 import { BUTTON, PRIMARY_BUTTON } from '../lib/ui.js'
+import { DEMO_MODE } from '../config.js'
 
 // Toolbar: the four things you can do.
 // Upload log  -> backend analyzes a new log (POST /analyze)
@@ -13,7 +14,7 @@ export default function Toolbar({ busy, hasReport, onUpload, onLoadLatest, onOpe
         Check a log file
       </FilePickerButton>
       <button type="button" onClick={onLoadLatest} className={BUTTON} disabled={busy} title="Show the most recent result again">
-        Last result
+        {DEMO_MODE ? 'Example report' : 'Last result'}
       </button>
       <FilePickerButton onFile={onOpenFile} accept=".json,application/json" className={BUTTON} disabled={busy}>
         Open saved report

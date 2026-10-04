@@ -52,7 +52,7 @@ export default function LogViewer({ lines, claim, jumpTarget, onlyEvidence, onTo
           <span aria-live="polite" className="ml-2 font-normal tracking-normal text-slate-300 normal-case">
             {claim
               ? `· ${evidence.size} line${evidence.size === 1 ? '' : 's'} of proof highlighted`
-              : '· click an AI statement to highlight its proof here'}
+              : '· click a statement to highlight its proof here'}
           </span>
         </h2>
         <label className={`flex items-center gap-2 text-xs ${claim ? 'text-slate-300' : 'text-slate-400 opacity-60'}`}>
