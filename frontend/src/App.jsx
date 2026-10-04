@@ -100,7 +100,7 @@ export default function App() {
       await new Promise((r) => setTimeout(r, 1500))
       if (liveJob.current !== first.job) return
       try {
-        const next = await pollAnalysis(first.job)
+        const next = await pollAnalysis(first.job, first.report.log_lines)
         if (liveJob.current !== first.job) return
         failures = 0
         setReport(next.report) // keeps the selected finding, statement and tab

@@ -113,12 +113,14 @@ export function analyzeLog(file) {
 }
 
 // A live job from the backend: the report so far, plus which statements are still being checked.
-function checkJob(body) {
+// Updates may leave out log_lines (they never change); `lines` fills them back in.
+function checkJob(body, lines = null) {
   if (!body || typeof body !== 'object' || !body.report) throw new Error('The backend sent an unexpected answer.')
+  const report = body.report.log_lines ? body.report : { ...body.report, log_lines: lines ?? [] }
   return {
     job: body.job ?? null,
     state: body.state ?? 'done',
-    report: { ...checkReport(body.report), live: true },
+    report: { ...checkReport(report), live: true },
     pending: new Set(Array.isArray(body.pending_claims) ? body.pending_claims : []),
     progress: body.progress ?? {},
   }
@@ -145,9 +147,12 @@ export function startAnalysis(file) {
   })
 }
 
-// GET /analyze/{job}: the live job so far.
-export function pollAnalysis(jobId) {
-  return request(`/analyze/${encodeURIComponent(jobId)}`, { timeoutMs: 20000, parse: checkJob })
+// GET /analyze/{job}: the live job so far, without the log lines (pass the ones we already have).
+export function pollAnalysis(jobId, lines) {
+  return request(`/analyze/${encodeURIComponent(jobId)}?lines=0`, {
+    timeoutMs: 20000,
+    parse: (body) => checkJob(body, lines),
+  })
 }
 
 // GET /status: the backend's progress while it analyzes, e.g.

@@ -218,12 +218,13 @@ def analyze_start(
 
 # The live job so far: the report (AI statements fill in as they're written and
 # checked), which statements are still being checked, and progress counts.
+# `lines=0` leaves out the log lines, which the dashboard already has.
 @app.get("/analyze/{job_id}")
-def analyze_status(job_id: str):
+def analyze_status(job_id: str, lines: int = 1):
     job = JOBS.get(job_id)
     if job is None:
         return error(404, "No such analysis (it may have finished long ago). Start a new one.")
-    return job.snapshot()
+    return job.snapshot(include_lines=bool(lines))
 
 
 # Progress of the current analysis, for the dashboard's loading screen:

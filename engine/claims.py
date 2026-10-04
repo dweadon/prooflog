@@ -119,8 +119,8 @@ class RateLimitedError(AIError):
     """The AI provider said "too many requests"; waiting a little usually fixes it."""
 
 
-RATE_LIMIT_WAIT_SECONDS = 20  # pause before retrying a rate-limited call
-RATE_LIMIT_RETRIES = 3        # extra tries after a rate limit (within the time budget)
+RATE_LIMIT_WAIT_SECONDS = 8   # pause before retrying a rate-limited call (Groq frees tokens every few seconds)
+RATE_LIMIT_RETRIES = 6        # extra tries after a rate limit (within the time budget)
 
 
 # Runs one AI call, and if the provider rate-limits it, waits and tries again

@@ -56,6 +56,13 @@ class JobTests(unittest.TestCase):
         self.assertEqual(report["trust_score"]["total"], 10)
         self.assertEqual(self.client.get("/report").json()["claims"], report["claims"])  # saved as latest
 
+    def test_updates_can_skip_the_log_lines(self):
+        job_id = self.start().json()["job"]
+        light = self.client.get(f"/analyze/{job_id}?lines=0").json()["report"]
+        self.assertNotIn("log_lines", light)
+        self.assertIn("alerts", light)
+        self.wait_done(job_id)
+
     def test_finished_job_is_cached(self):
         self.wait_done(self.start().json()["job"])
         again = self.start()

@@ -42,9 +42,14 @@ class Job:
         self.alerts_done = 0
 
     # A copy of the job right now: the report so far (contract format) plus progress.
-    def snapshot(self) -> dict:
+    # `include_lines=False` leaves out log_lines (they never change during a job),
+    # so the dashboard's frequent updates stay small.
+    def snapshot(self, include_lines: bool = True) -> dict:
         with self.lock:
-            report = assemble_report(self.source_name, self.source_type, self.alerts, self.claims, self.lines)
+            report = assemble_report(self.source_name, self.source_type, self.alerts, self.claims,
+                                     self.lines if include_lines else [])
+            if not include_lines:
+                del report["log_lines"]
             return {
                 "job": self.id,
                 "state": self.state,
