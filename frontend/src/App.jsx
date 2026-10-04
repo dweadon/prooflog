@@ -12,12 +12,19 @@ import ErrorBanner from './components/ErrorBanner.jsx'
 import ReportChecks from './components/ReportChecks.jsx'
 import BusyOverlay from './components/BusyOverlay.jsx'
 import PrintReport from './components/PrintReport.jsx'
-import SummaryBanner from './components/SummaryBanner.jsx'
 import HelpDialog from './components/HelpDialog.jsx'
 import DemoBanner from './components/DemoBanner.jsx'
 import Landing from './components/Landing.jsx'
 import DropOverlay from './components/DropOverlay.jsx'
 import { scanFile } from './lib/scan.js'
+import { computeStats } from './lib/stats.js'
+import ResultHeader from './components/results/ResultHeader.jsx'
+import ResultTabs from './components/results/ResultTabs.jsx'
+import SummaryTab from './components/results/SummaryTab.jsx'
+import ScoresTab from './components/results/ScoresTab.jsx'
+import AttackersTab from './components/results/AttackersTab.jsx'
+import ChecksTab from './components/results/ChecksTab.jsx'
+import LogTab from './components/results/LogTab.jsx'
 import { DEMO_MODE } from './config.js'
 
 // App: holds the current report and what's selected, and lays out the
@@ -36,6 +43,7 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(false)
   const [view, setView] = useState('landing') // 'landing' first, then 'dashboard'
   const [dragging, setDragging] = useState(false) // a file is being dragged over the page
+  const [tab, setTab] = useState('summary') // which results tab is open
   const [progress, setProgress] = useState(null) // backend progress while a log is being checked
 
   // Shared by every way of getting a report: show a busy message,
@@ -47,6 +55,7 @@ export default function App() {
       const data = await getReport()
       setReport(data)
       setSelectedAlertId(sortBySeverity(data.alerts)[0]?.id ?? null) // start on the most severe alert
+      setTab('summary') // every new result opens on its overview
       setSelectedClaimId(null)
       setJumpTarget(null)
     } catch (e) {
@@ -137,9 +146,17 @@ export default function App() {
     setJumpTarget({ line, nonce: Date.now() })
   }
 
+  // From the other tabs: open a finding (and optionally one of its statements) in the Findings tab.
+  const openFinding = (alertId, claimId = null) => {
+    setTab('findings')
+    selectAlert(alertId)
+    if (claimId) setSelectedClaimId(claimId)
+  }
+
   // Double-check the backend's report (trust score recount, broken evidence links, duplicate ids).
   const checks = useMemo(() => (report ? checkReportIntegrity(report) : null), [report])
   const existingLines = useMemo(() => new Set(report?.log_lines.map((l) => l.line)), [report])
+  const stats = useMemo(() => (report ? computeStats(report) : null), [report])
   const selectedAlert = report?.alerts.find((a) => a.id === selectedAlertId)
   const alertClaims = report?.claims.filter((c) => c.alert_id === selectedAlertId) ?? []
   const selectedClaim = alertClaims.find((c) => c.id === selectedClaimId) ?? null
@@ -161,8 +178,6 @@ export default function App() {
   return (
     <div className="flex min-h-screen flex-col bg-slate-950 text-slate-200 lg:h-screen">
       <Header
-        report={report}
-        trust={checks?.trust}
         onShowHelp={() => setShowHelp(true)}
         onHome={() => setView('landing')}
         actions={
@@ -180,12 +195,19 @@ export default function App() {
       {DEMO_MODE && <DemoBanner report={report} />}
       {report && error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       {checks && <ReportChecks warnings={checks.warnings} />}
-      {report && <SummaryBanner report={report} trust={checks.trust} onShowHelp={() => setShowHelp(true)} />}
-
       {!report ? (
         busyMessage ? null : <EmptyState error={error} onUpload={handleLogFile} onShowHelp={() => setShowHelp(true)} />
       ) : (
-        <main className="flex flex-col lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[260px_minmax(0,1fr)_minmax(0,1.15fr)]">
+        <div className="flex flex-col lg:min-h-0 lg:flex-1">
+          <ResultHeader report={report} stats={stats} trust={checks.trust} />
+          <ResultTabs
+            tab={tab}
+            onChange={setTab}
+            counts={{ findings: report.alerts.length, attackers: stats.attackers.length, checks: report.claims.length }}
+            instant={Boolean(report.instant)}
+          />
+          {tab === 'findings' ? (
+        <main className="mx-4 mb-4 flex flex-col overflow-hidden rounded-xl border border-slate-800 sm:mx-5 lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[260px_minmax(0,1fr)_minmax(0,1.15fr)]">
           <div className="border-b border-slate-800 lg:min-h-0 lg:overflow-y-auto lg:border-r lg:border-b-0">
             <AlertList alerts={report.alerts} selectedId={selectedAlertId} onSelect={selectAlert} />
           </div>
@@ -215,6 +237,16 @@ export default function App() {
             />
           </div>
         </main>
+          ) : (
+            <main className="mx-4 mb-4 sm:mx-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+              {tab === 'summary' && <SummaryTab report={report} stats={stats} onGoTo={setTab} />}
+              {tab === 'scores' && <ScoresTab report={report} stats={stats} />}
+              {tab === 'attackers' && <AttackersTab stats={stats} onOpenFinding={openFinding} />}
+              {tab === 'checks' && <ChecksTab report={report} onOpenFinding={openFinding} />}
+              {tab === 'log' && <LogTab report={report} stats={stats} />}
+            </main>
+          )}
+        </div>
       )}
 
       {busyMessage && <BusyOverlay message={busyMessage} progress={progress} />}

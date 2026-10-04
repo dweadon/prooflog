@@ -20,7 +20,9 @@ const LogLine = memo(function LogLine({ line, highlight, focused }) {
       ? 'border-emerald-400 bg-emerald-500/15'
       : highlight === 'unverified'
         ? 'border-red-400 bg-red-500/15'
-        : 'border-transparent hover:bg-slate-800/40'
+        : highlight === 'flagged' // evidence for some finding (Log file tab)
+          ? 'border-amber-400/70 bg-amber-400/10'
+          : 'border-transparent hover:bg-slate-800/40'
 
   return (
     <li

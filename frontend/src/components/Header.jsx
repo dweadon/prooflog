@@ -1,11 +1,7 @@
-import TrustBadge from './TrustBadge.jsx'
-import { formatTime } from '../lib/format.js'
 
-// Header: product name and action buttons on top; below that (once a report is
-// loaded) where the log came from, when the report was made, and the trust score.
-// `trust` is recounted from the claims by the dashboard, not copied from the backend.
-export default function Header({ report, trust, actions, onShowHelp, onHome }) {
-  const meta = report?.meta
+// Header: product name (click to go back to the start page) and the action buttons.
+// Details about the current report live in the result card below it.
+export default function Header({ actions, onShowHelp, onHome }) {
   return (
     <header className="border-b border-slate-800 bg-slate-900/80 px-4 py-3 sm:px-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -25,27 +21,6 @@ export default function Header({ report, trust, actions, onShowHelp, onHome }) {
         </div>
       </div>
 
-      {report && (
-        <div className="mt-2.5 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-          <div className="min-w-0">
-            <span className="text-slate-400">Log file: </span>
-            <span className="break-words text-slate-100">{meta.source_name}</span>
-          </div>
-          <div>
-            <span className="text-slate-400">Checked on: </span>
-            <time dateTime={meta.generated_at} className="text-slate-100">
-              {formatTime(meta.generated_at)}
-            </time>
-          </div>
-          {report.instant ? (
-            <span className="inline-flex items-center rounded-full bg-sky-500/15 px-3 py-1 text-sm font-medium text-sky-200 ring-1 ring-sky-500/40">
-              Instant scan · no AI · nothing uploaded
-            </span>
-          ) : (
-            <TrustBadge verified={trust.verified} total={trust.total} />
-          )}
-        </div>
-      )}
     </header>
   )
 }
