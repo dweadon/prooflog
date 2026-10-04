@@ -1,0 +1,13 @@
+# Render blueprint: deploys ProofLog (AI backend + dashboard) as one free web service.
+# You'll be asked for GROQ_API_KEY during setup; it stays in Render's secret settings.
+services:
+  - type: web
+    name: prooflog
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: PROOFLOG_PROVIDER
+        value: groq
