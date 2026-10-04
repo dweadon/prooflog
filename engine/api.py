@@ -65,6 +65,27 @@ def cache_path(data: bytes, filename: str, source_type: str, year, inject: bool)
     return REPORT_PATH.parent / "cache" / f"{h[:32]}.json"
 
 
+# Pre-loads the cache with saved, fully verified reports for the bundled example
+# logs (examples/<name>.log + examples/<name>.report.json), so analysing the
+# example is instant even on hosts that wipe their disk when they sleep.
+def seed_example_cache() -> None:
+    for log in sorted((PROJECT_DIR / "examples").glob("*.log")):
+        saved = log.with_suffix(".report.json")
+        if not saved.exists():
+            continue
+        target = cache_path(log.read_bytes(), log.name, "public dataset", None, False)
+        if target.exists():
+            continue
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(saved.read_text(encoding="utf-8"), encoding="utf-8")
+        except OSError:
+            pass  # not critical: the example just gets analysed the slow way
+
+
+seed_example_cache()
+
+
 # Health check, so the dashboard (or you) can see the server is up.
 @app.get("/health")
 def health():
