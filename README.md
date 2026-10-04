@@ -14,6 +14,7 @@ log file ─► 1 Parser ─► 2 Rules ─► 3 AI claim writer ─► 4 Verifi
 
 - **Backend** (`engine/`): Python, FastAPI. Parser, detection rules, AI claim writer, verifier and HTTP API.
 - **Dashboard** (`frontend/`): React, Vite, Tailwind. Click any AI statement to see its proof highlighted in the original log. See `frontend/README.md`.
+- **VirusTotal-style results:** a result card with the threat count and a verdict, then tabs for Summary, Findings, Attackers, Scores (each percentage explains how it was calculated), Proof checks and the full Log file.
 - **Drag-and-drop scanning:** drop a log file anywhere on the page. On the live demo it is scanned **instantly in your browser** (the same parser and rules, ported to JavaScript in `frontend/src/lib/scan.js`; the file is never uploaded). With the backend running, a dropped file gets the full AI analysis and verification.
 
 ## Quick start
