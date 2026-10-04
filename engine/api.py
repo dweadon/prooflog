@@ -21,6 +21,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import progress
 from .claims import MODEL, PROVIDER, VERIFY_MODEL
+from . import jobs
 from .report import BadLogError, build_report
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
@@ -148,6 +149,81 @@ def analyze(
         unique = sorted(set(ai_errors.values()))
         headers["X-ProofLog-AI-Errors"] = f"{len(ai_errors)} issue(s): " + " | ".join(unique)
     return JSONResponse(content=report, headers=headers)
+
+
+# Live jobs by id (only the most recent few are kept).
+JOBS: dict[str, jobs.Job] = {}
+MAX_JOBS = 5
+
+
+# Called when a live job ends: saves the report as the latest, caches it if
+# complete, and frees the one-analysis-at-a-time lock.
+def finish_job(job, report: dict, ai_errors: dict, cached: Path) -> None:
+    try:
+        save_report(report)
+        if job.state == "done" and not ai_errors and report["claims"]:
+            cached.parent.mkdir(parents=True, exist_ok=True)
+            cached.write_text(json.dumps(report), encoding="utf-8")
+    except OSError:
+        pass
+    finally:
+        _analysis_lock.release()
+
+
+# Starts a live analysis and answers at once with the rule-based findings.
+# The AI statements and their verdicts then fill in: poll GET /analyze/{job}.
+# A file analysed before is answered from the cache, already complete.
+@app.post("/analyze/start")
+def analyze_start(
+    file: UploadFile = File(...),
+    source_type: str = Form("public dataset"),
+    year: int | None = Form(None),
+    debug_inject_false_claim: bool = Form(False),
+    use_cache: bool = Form(True),
+):
+    data = file.file.read(MAX_UPLOAD_BYTES + 1)
+    if len(data) > MAX_UPLOAD_BYTES:
+        return error(413, f"File too large (max {MAX_UPLOAD_BYTES // (1024 * 1024)} MB).")
+    filename = file.filename or "upload.log"
+    inject = debug_inject_false_claim or os.environ.get("PROOFLOG_DEBUG_INJECT") == "1"
+
+    cached = cache_path(data, filename, source_type, year, inject)
+    if use_cache and cached.exists():
+        try:
+            report = json.loads(cached.read_text(encoding="utf-8"))
+            save_report(report)
+            done = {"alerts_done": 0, "alerts_total": 0, "claims_pending": 0, "elapsed_seconds": 0}
+            return JSONResponse(content={"job": None, "state": "done", "report": report, "pending_claims": [],
+                                         "progress": done}, headers={"X-ProofLog-Cache": "hit"})
+        except (OSError, json.JSONDecodeError):
+            pass
+
+    if not _analysis_lock.acquire(blocking=False):
+        return error(409, "An analysis is already running. Try again in a minute.")
+    try:
+        job = jobs.start_job(data, filename, source_type, year, inject,
+                             on_done=lambda j, report, errs: finish_job(j, report, errs, cached))
+    except BadLogError as e:
+        _analysis_lock.release()
+        return error(400, str(e))
+    except Exception as e:  # last-resort guard: never crash the server
+        _analysis_lock.release()
+        return error(500, f"Analysis failed unexpectedly: {type(e).__name__}")
+
+    JOBS[job.id] = job
+    for old_id in list(JOBS)[:-MAX_JOBS]:
+        JOBS.pop(old_id, None)
+    return JSONResponse(status_code=202, content=job.snapshot(), headers={"X-ProofLog-Cache": "miss"})
+
+
+# The live job so far: the report (AI statements fill in as they're written and
+# checked), which statements are still being checked, and progress counts.
+@app.get("/analyze/{job_id}")
+def analyze_status(job_id: str):
+    job = JOBS.get(job_id)
+    if job is None:
+        return error(404, "No such analysis (it may have finished long ago). Start a new one.")
+    return job.snapshot()
 
 
 # Progress of the current analysis, for the dashboard's loading screen:

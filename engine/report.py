@@ -29,36 +29,24 @@ def trust_score(claims) -> dict:
     return {"verified": sum(1 for c in claims if c.verified), "total": len(claims)}
 
 
-# Runs parse -> detect -> AI claims -> verify and returns (report_dict, ai_errors).
-# If any claim couldn't be fully checked (no key, AI error, time budget), that
-# counts as an AI error too, so the API won't cache an incomplete report.
-# `inject_false` (debug) adds one deliberately false claim before
-# verification, to demo the verifier catching it.
-# Raises BadLogError for files we can't analyse.
-def build_report(data: bytes, source_name: str, source_type: str, year: int | None = None,
-                 client=None, inject_false: bool = False) -> tuple[dict, dict[int, str]]:
+# Checks an upload and parses it into numbered lines. Raises BadLogError for
+# files we can't analyse. Shared by the one-shot report and the live job.
+def prepare_lines(data: bytes, source_type: str, year: int | None = None):
     if source_type not in SOURCE_TYPES:
         raise BadLogError(f"source_type must be one of: {', '.join(SOURCE_TYPES)}")
     if not data.strip():
         raise BadLogError("The file is empty.")
     if b"\x00" in data[:8192]:
         raise BadLogError("This looks like a binary file, not a text log.")
-
-    progress.start_stage("parsing")
     lines = parse_text(decode_log_bytes(data), year=year)
     if not any(l.event_type != OTHER for l in lines):
         raise BadLogError("No SSH login events found. Expected an SSH auth.log (Loghub SSH format).")
+    return lines
 
-    start = time.monotonic()
-    alerts = run_detections(lines)
-    # Claim writing gets the first 60% of the time budget, and verification the rest.
-    claims, ai_errors = write_claims(alerts, lines, client=client,
-                                     deadline=start + TIME_BUDGET_SECONDS * 0.6)
-    if inject_false:
-        inject_false_claim(claims, alerts)
-    verify_claims(claims, lines, client=client, deadline=start + TIME_BUDGET_SECONDS)
 
-    report = {
+# Puts the pieces together in the report.json contract format.
+def assemble_report(source_name: str, source_type: str, alerts, claims, lines) -> dict:
+    return {
         "meta": {
             "source_name": source_name,
             "source_type": source_type,
@@ -69,6 +57,29 @@ def build_report(data: bytes, source_name: str, source_type: str, year: int | No
         "claims": [c.to_contract() for c in claims],
         "log_lines": [l.to_contract() for l in lines],
     }
+
+
+# Runs parse -> detect -> AI claims -> verify and returns (report_dict, ai_errors).
+# If any claim couldn't be fully checked (no key, AI error, time budget), that
+# counts as an AI error too, so the API won't cache an incomplete report.
+# `inject_false` (debug) adds one deliberately false claim before
+# verification, to demo the verifier catching it.
+# Raises BadLogError for files we can't analyse.
+def build_report(data: bytes, source_name: str, source_type: str, year: int | None = None,
+                 client=None, inject_false: bool = False) -> tuple[dict, dict[int, str]]:
+    progress.start_stage("parsing")
+    lines = prepare_lines(data, source_type, year)
+
+    start = time.monotonic()
+    alerts = run_detections(lines)
+    # Claim writing gets the first 60% of the time budget, and verification the rest.
+    claims, ai_errors = write_claims(alerts, lines, client=client,
+                                     deadline=start + TIME_BUDGET_SECONDS * 0.6)
+    if inject_false:
+        inject_false_claim(claims, alerts)
+    verify_claims(claims, lines, client=client, deadline=start + TIME_BUDGET_SECONDS)
+
+    report = assemble_report(source_name, source_type, alerts, claims, lines)
     unchecked = [c for c in claims if not c.checked]
     if unchecked:
         ai_errors = {**ai_errors, 0: f"{len(unchecked)} claim(s) could not be fully verified."}
