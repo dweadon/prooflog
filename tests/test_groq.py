@@ -60,6 +60,18 @@ class GroqTests(unittest.TestCase):
         self.assertIn("<log_data>", first["messages"][1]["content"])
         self.assertEqual(first["reasoning_effort"], "medium")
 
+    def test_verifier_uses_its_own_model_and_smaller_limits(self):
+        from engine import verify as verify_mod
+        client = FakeGroq()
+        claims, _ = write_claims(self.alerts[:1], self.lines, client=client)
+        with mock.patch.multiple(verify_mod, VERIFY_MODEL="openai/gpt-oss-20b", VERIFY_MAX_TOKENS=1024):
+            verify_claims(claims, self.lines, client=client)
+        writer = [r for r in client.requests if "verdict" not in r["messages"][0]["content"]]
+        checker = [r for r in client.requests if "verdict" in r["messages"][0]["content"]]
+        self.assertEqual({r["model"] for r in writer}, {"openai/gpt-oss-120b"})
+        self.assertEqual({r["model"] for r in checker}, {"openai/gpt-oss-20b"})
+        self.assertEqual({r["max_completion_tokens"] for r in checker}, {1024})
+
     def test_falls_back_to_json_mode_if_schema_unsupported(self):
         client = FakeGroq(reject_json_schema=True)
         claims, errors = write_claims(self.alerts[:1], self.lines, client=client)

@@ -20,7 +20,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import progress
-from .claims import MODEL, PROVIDER
+from .claims import MODEL, PROVIDER, VERIFY_MODEL
 from .report import BadLogError, build_report
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
@@ -90,7 +90,8 @@ seed_example_cache()
 @app.get("/health")
 def health():
     key = "GROQ_API_KEY" if PROVIDER == "groq" else "ANTHROPIC_API_KEY"
-    return {"status": "ok", "provider": PROVIDER, "model": MODEL, "ai_key_set": bool(os.environ.get(key)),
+    return {"status": "ok", "provider": PROVIDER, "model": MODEL, "verify_model": VERIFY_MODEL,
+            "ai_key_set": bool(os.environ.get(key)),
             "version": os.environ.get("RENDER_GIT_COMMIT", "local")[:7]}  # Render sets the deployed commit
 
 

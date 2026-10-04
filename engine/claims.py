@@ -41,18 +41,25 @@ def pick_provider() -> str:
 
 # ---- Settings (each can be overridden with an environment variable) ------------------
 PROVIDER = pick_provider()
-# Groq's free tier allows only ~8,000 tokens per minute, so its defaults send
-# fewer alerts and shorter prompts, with fewer calls at once.
+# Groq's free tier allows only ~8,000 tokens per minute PER MODEL, so its
+# defaults send fewer alerts and shorter prompts, keep thinking short, and give
+# the verifier its own (smaller, faster) model so the two stages don't share
+# one token allowance. That keeps a full analysis to about 1-2 minutes.
 _DEFAULTS = {
-    "anthropic": {"model": "claude-opus-5", "alerts": 15, "lines": 300, "parallel": 8},
-    "groq": {"model": "openai/gpt-oss-120b", "alerts": 6, "lines": 40, "parallel": 2},
+    "anthropic": {"model": "claude-opus-5", "verify_model": "claude-opus-5", "alerts": 15, "lines": 300,
+                  "parallel": 8, "effort": "medium", "claim_tokens": 16000, "verify_tokens": 16000},
+    "groq": {"model": "openai/gpt-oss-120b", "verify_model": "openai/gpt-oss-20b", "alerts": 6, "lines": 30,
+             "parallel": 3, "effort": "low", "claim_tokens": 2048, "verify_tokens": 1024},
 }[PROVIDER]
-MODEL = os.environ.get("PROOFLOG_MODEL", _DEFAULTS["model"])
+MODEL = os.environ.get("PROOFLOG_MODEL", _DEFAULTS["model"])  # writes the claims
+VERIFY_MODEL = os.environ.get("PROOFLOG_VERIFY_MODEL", _DEFAULTS["verify_model"])  # checks them
+CLAIM_MAX_TOKENS = _DEFAULTS["claim_tokens"]    # output limit for one claim-writing call
+VERIFY_MAX_TOKENS = _DEFAULTS["verify_tokens"]  # output limit for one verifier call
 MAX_AI_ALERTS = int(os.environ.get("PROOFLOG_MAX_AI_ALERTS", _DEFAULTS["alerts"]))  # most severe alerts sent
 MAX_LINES_PER_ALERT = int(os.environ.get("PROOFLOG_MAX_LINES", _DEFAULTS["lines"]))  # evidence lines shown per alert
 PARALLEL_CALLS = int(os.environ.get("PROOFLOG_PARALLEL_CALLS", _DEFAULTS["parallel"]))  # AI calls at the same time
 CALL_TIMEOUT_SECONDS = 120    # one AI call taking longer than this is abandoned
-CLAIMS_EFFORT = os.environ.get("PROOFLOG_CLAIMS_EFFORT", "medium")  # how hard the model thinks (low..max)
+CLAIMS_EFFORT = os.environ.get("PROOFLOG_CLAIMS_EFFORT", _DEFAULTS["effort"])  # how hard the model thinks (low..max)
 # ------------------------------------------------------------------------------------------
 
 # Set to False the first time Groq rejects strict JSON-schema output for the
@@ -217,14 +224,16 @@ def validate_output(raw: str) -> tuple[str, list[dict]]:
 # request so the report still gets made.
 # The verifier (Stage 4) reuses this with its own system prompt, schema and effort.
 # With PROVIDER=groq the request goes to Groq instead (see call_groq).
-def call_ai(client, prompt: str, system: str = SYSTEM_PROMPT,
-            schema: dict = OUTPUT_SCHEMA, effort: str = CLAIMS_EFFORT) -> str:
+def call_ai(client, prompt: str, system: str = SYSTEM_PROMPT, schema: dict = OUTPUT_SCHEMA,
+            effort: str = CLAIMS_EFFORT, model: str | None = None, max_tokens: int | None = None) -> str:
+    model = model or MODEL
+    max_tokens = max_tokens or CLAIM_MAX_TOKENS
     if PROVIDER == "groq":
-        return call_groq(client, prompt, system, schema, effort)
+        return call_groq(client, prompt, system, schema, effort, model, max_tokens)
     global _fallbacks_supported
     request = dict(
-        model=MODEL,
-        max_tokens=16000,
+        model=model,
+        max_tokens=max_tokens,
         system=system,
         messages=[{"role": "user", "content": prompt}],
         output_config={"effort": effort, "format": {"type": "json_schema", "schema": schema}},
@@ -263,7 +272,7 @@ def call_ai(client, prompt: str, system: str = SYSTEM_PROMPT,
 # Asks for strict JSON-schema output; if the model doesn't support that, falls
 # back to plain JSON mode (our validate step still checks the shape).
 # The schema is also written into the system prompt, which JSON mode needs.
-def call_groq(client, prompt: str, system: str, schema: dict, effort: str) -> str:
+def call_groq(client, prompt: str, system: str, schema: dict, effort: str, model: str, max_tokens: int) -> str:
     global _groq_json_schema_supported
     messages = [
         {"role": "system", "content": f"{system}\n\nReply with only a JSON object matching this schema:\n"
@@ -271,14 +280,14 @@ def call_groq(client, prompt: str, system: str, schema: dict, effort: str) -> st
         {"role": "user", "content": prompt},
     ]
     extra = {}
-    if MODEL.startswith(("openai/gpt-oss", "qwen/")):  # reasoning models: keep thinking short and fast
+    if model.startswith(("openai/gpt-oss", "qwen/")):  # reasoning models: keep thinking short and fast
         extra["reasoning_effort"] = {"low": "low", "medium": "medium"}.get(effort, "high")
 
     def send(json_schema: bool):
         fmt = ({"type": "json_schema", "json_schema": {"name": "prooflog", "strict": True, "schema": schema}}
                if json_schema else {"type": "json_object"})
-        return client.chat.completions.create(model=MODEL, messages=messages, response_format=fmt,
-                                              temperature=0, max_completion_tokens=4096, **extra)
+        return client.chat.completions.create(model=model, messages=messages, response_format=fmt,
+                                              temperature=0, max_completion_tokens=max_tokens, **extra)
 
     try:
         try:

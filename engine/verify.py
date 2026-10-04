@@ -25,8 +25,8 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
-from .claims import (PARALLEL_CALLS, AIError, call_ai, escape_log_text, make_client, out_of_time,
-                     with_rate_limit_retry, write_claims)
+from .claims import (PARALLEL_CALLS, VERIFY_MAX_TOKENS, VERIFY_MODEL, AIError, call_ai, escape_log_text,
+                     make_client, out_of_time, with_rate_limit_retry, write_claims)
 from . import progress
 from .detect import format_ranges, run_detections
 from .parser import parse_file
@@ -226,7 +226,8 @@ def ai_check(client, claim: Claim, cited: list[ParsedLine], deadline: float | No
     for _attempt in range(2):
         try:
             data = json.loads(with_rate_limit_retry(
-                lambda: call_ai(client, prompt, system=VERIFIER_PROMPT, schema=VERIFIER_SCHEMA, effort=VERIFY_EFFORT),
+                lambda: call_ai(client, prompt, system=VERIFIER_PROMPT, schema=VERIFIER_SCHEMA, effort=VERIFY_EFFORT,
+                                model=VERIFY_MODEL, max_tokens=VERIFY_MAX_TOKENS),
                 deadline))
             verdict, reason = data["verdict"], str(data["reason"]).strip()
             if verdict in ("supported", "not supported"):
