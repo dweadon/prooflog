@@ -41,6 +41,8 @@ jobs:
         run: npx vite build --base=/prooflog/
         env:
           VITE_DEMO: "1"
+          # Address of the hosted AI backend (repo variable PROOFLOG_API_URL); empty = no AI on the demo.
+          VITE_LIVE_API_URL: ${{ vars.PROOFLOG_API_URL }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: frontend/dist

@@ -1,4 +1,4 @@
-import { API_BASE_URL, DEMO_MODE, UPLOAD_FIELD_NAME } from './config.js'
+import { AI_AVAILABLE, API_BASE_URL, DEMO_MODE, UPLOAD_FIELD_NAME } from './config.js'
 
 // How long to wait for the AI analysis before giving up.
 // A 2,000-line log took about 3 minutes on the real backend, so leave plenty of room.
@@ -85,7 +85,7 @@ export function fetchLatestReport() {
 
 // POST /analyze: sends a log file (multipart form field "file") and gets back a report.
 export function analyzeLog(file) {
-  if (DEMO_MODE) {
+  if (!AI_AVAILABLE) {
     return Promise.reject(new Error(
       'This online demo only shows a saved report. To check your own log file, run ProofLog on your computer (see the GitHub page).'))
   }
@@ -98,6 +98,7 @@ export function analyzeLog(file) {
     method: 'POST',
     body: form,
     timeoutMs: ANALYZE_TIMEOUT_MS,
+    // A free hosted backend may be asleep: the first request can take a minute to wake it.
     messages: {
       404: 'The backend has no /analyze endpoint yet (404).',
       409: 'An analysis is already running. Wait for it to finish, then try again.',

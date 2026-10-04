@@ -36,6 +36,21 @@ Run the tests with `python -m unittest -v` (no API key needed).
 
 **Example log:** `examples/OpenSSH_2k.log` is a real 2,000-line SSH log from a server under attack (from Loghub; see `examples/README.md`). Upload it with **Check a log file**, or run `python -m engine.detect examples/OpenSSH_2k.log`.
 
+## Deploy with live AI (Render, free)
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/dweadon/prooflog)
+
+1. Click the button and sign in to Render (you can use your GitHub account).
+2. When asked, paste your `GROQ_API_KEY`. It's stored in Render's secret settings, never in the code.
+3. Render builds the `Dockerfile` (the dashboard plus the AI backend) and gives you a public address like `https://prooflog-xxxx.onrender.com`. That address runs the full app.
+4. Optional: connect the GitHub Pages demo to it, so "Analyse with AI" appears after an instant scan:
+   ```bash
+   gh variable set PROOFLOG_API_URL --body "https://prooflog-xxxx.onrender.com"
+   gh workflow run pages.yml
+   ```
+
+On Render's free plan the service sleeps when idle, so the first request after a break takes about a minute to wake it. Only one analysis runs at a time (others get a clear "busy" message), and identical uploads are served from a cache, which limits use of your Groq quota.
+
 ## Credits and open-source used
 
 ProofLog's own code is in `engine/`, `tests/` and `frontend/src/`. It builds on these open-source projects, datasets and services:

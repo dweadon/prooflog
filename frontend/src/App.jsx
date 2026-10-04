@@ -25,7 +25,7 @@ import ScoresTab from './components/results/ScoresTab.jsx'
 import AttackersTab from './components/results/AttackersTab.jsx'
 import ChecksTab from './components/results/ChecksTab.jsx'
 import LogTab from './components/results/LogTab.jsx'
-import { DEMO_MODE } from './config.js'
+import { AI_AVAILABLE, DEMO_MODE } from './config.js'
 
 // App: holds the current report and what's selected, and lays out the
 // dashboard: alerts (left), alert details + claims (center), log (right).
@@ -44,6 +44,7 @@ export default function App() {
   const [view, setView] = useState('landing') // 'landing' first, then 'dashboard'
   const [dragging, setDragging] = useState(false) // a file is being dragged over the page
   const [tab, setTab] = useState('summary') // which results tab is open
+  const [lastFile, setLastFile] = useState(null) // the file behind an instant scan, for 'Analyse with AI'
   const [progress, setProgress] = useState(null) // backend progress while a log is being checked
 
   // Shared by every way of getting a report: show a busy message,
@@ -76,7 +77,8 @@ export default function App() {
       const seconds = Math.round((Date.now() - started) / 1000)
       setProgress((current) => (current ? { ...current, ...(s?.stage && s.stage !== 'idle' ? s : {}), seconds } : current))
     }, 2000)
-    return loadWith(`Checking ${file.name}`, () => analyzeLog(file)).finally(() => {
+    // `live: true` marks a full AI analysis from the server (the demo banner says so).
+    return loadWith(`Checking ${file.name} with AI`, () => analyzeLog(file).then((r) => ({ ...r, live: true }))).finally(() => {
       clearInterval(timer)
       setProgress(null)
     })
@@ -94,7 +96,10 @@ export default function App() {
   // uploaded; with the backend running it gets the full AI analysis.
   const handleLogFile = (file) => {
     setView('dashboard')
-    if (DEMO_MODE) return loadWith(`Scanning ${file.name}…`, () => scanFile(file))
+    if (DEMO_MODE) {
+      setLastFile(file)
+      return loadWith(`Scanning ${file.name}…`, () => scanFile(file))
+    }
     return uploadLog(file)
   }
 
@@ -192,7 +197,12 @@ export default function App() {
         }
       />
 
-      {DEMO_MODE && <DemoBanner report={report} />}
+      {DEMO_MODE && (
+        <DemoBanner
+          report={report}
+          onAnalyseWithAI={AI_AVAILABLE && lastFile && report?.instant ? () => uploadLog(lastFile) : null}
+        />
+      )}
       {report && error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       {checks && <ReportChecks warnings={checks.warnings} />}
       {!report ? (
