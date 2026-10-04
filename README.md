@@ -1,5 +1,7 @@
 # ProofLog: AI security analysis you can audit
 
+**Live demo:** https://dweadon.github.io/prooflog/ (the dashboard showing a real report from the public Loghub OpenSSH log; to analyse your own logs, run it locally as below)
+
 ProofLog reads a real server login log, finds suspicious activity (brute force, password spraying, logins after many failures, logins at odd hours) and writes a plain-English incident report.
 
 **Its core rule: the AI may not make any claim unless it points to the exact log lines that prove it.** A separate verifier checks every claim against those lines, partly with plain code (counts, IP addresses, times, usernames) and partly with a second AI call. Claims it can't prove are shown in red as "not proven".
