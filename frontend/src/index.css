@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+/* Visible keyboard focus everywhere (only shows for keyboard users, not mouse clicks). */
+button:focus-visible,
+input:focus-visible,
+a:focus-visible {
+  outline: 2px solid #34d399;
+  outline-offset: 2px;
+}
+
+/* Print / "Save as PDF" settings for the export view. */
+@media print {
+  @page {
+    margin: 16mm;
+  }
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
