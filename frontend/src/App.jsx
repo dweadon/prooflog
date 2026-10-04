@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { analyzeLog, fetchLatestReport, fetchStatus, readReportFile } from './api.js'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { fetchLatestReport, pollAnalysis, readReportFile, startAnalysis } from './api.js'
 import { sortBySeverity } from './lib/severity.js'
 import { checkReportIntegrity } from './lib/reportChecks.js'
 import Header from './components/Header.jsx'
@@ -45,43 +45,74 @@ export default function App() {
   const [dragging, setDragging] = useState(false) // a file is being dragged over the page
   const [tab, setTab] = useState('summary') // which results tab is open
   const [lastFile, setLastFile] = useState(null) // the file behind an instant scan, for 'Analyse with AI'
-  const [progress, setProgress] = useState(null) // backend progress while a log is being checked
+  // A live AI analysis filling in: { job, state, pending: Set of claim ids, progress }. null otherwise.
+  const [live, setLive] = useState(null)
+  const liveJob = useRef(null) // id of the job being polled; anything else stops polling
 
   // Shared by every way of getting a report: show a busy message,
   // then either show the new report or a friendly error (keeping the old report).
+  // Shows a new report from the start: most severe finding selected, Summary tab open.
+  const showNewReport = useCallback((data) => {
+    setReport(data)
+    setSelectedAlertId(sortBySeverity(data.alerts)[0]?.id ?? null)
+    setTab('summary')
+    setSelectedClaimId(null)
+    setJumpTarget(null)
+  }, [])
+
   const loadWith = useCallback(async (message, getReport) => {
     setBusyMessage(message)
     setError(null)
+    liveJob.current = null // a new report stops any live analysis updates
+    setLive(null)
     try {
-      const data = await getReport()
-      setReport(data)
-      setSelectedAlertId(sortBySeverity(data.alerts)[0]?.id ?? null) // start on the most severe alert
-      setTab('summary') // every new result opens on its overview
-      setSelectedClaimId(null)
-      setJumpTarget(null)
+      showNewReport(await getReport())
     } catch (e) {
       setError(e.message)
     } finally {
       setBusyMessage(null)
     }
-  }, [])
+  }, [showNewReport])
 
   const loadLatest = useCallback(() => loadWith('Loading the last result…', fetchLatestReport), [loadWith])
-  // Upload: while the backend works (can take minutes), poll GET /status every 2 seconds
-  // and show its progress in the spinner, so the demo never looks frozen.
-  const uploadLog = (file) => {
-    const started = Date.now()
-    setProgress({ stage: 'parsing', done: 0, total: 0, seconds: 0 })
-    const timer = setInterval(async () => {
-      const s = await fetchStatus()
-      const seconds = Math.round((Date.now() - started) / 1000)
-      setProgress((current) => (current ? { ...current, ...(s?.stage && s.stage !== 'idle' ? s : {}), seconds } : current))
-    }, 2000)
-    // `live: true` marks a full AI analysis from the server (the demo banner says so).
-    return loadWith(`Checking ${file.name} with AI`, () => analyzeLog(file).then((r) => ({ ...r, live: true }))).finally(() => {
-      clearInterval(timer)
-      setProgress(null)
-    })
+  // Upload for the full AI analysis. The backend answers at once with the rule-based
+  // findings, which are shown straight away; then we poll every 1.5 s and the AI
+  // statements and their verdicts fill in on screen as they're written and checked.
+  const uploadLog = async (file) => {
+    setError(null)
+    setBusyMessage(`Uploading ${file.name}…`)
+    liveJob.current = null
+    let first
+    try {
+      first = await startAnalysis(file)
+    } catch (e) {
+      setError(e.message)
+      return
+    } finally {
+      setBusyMessage(null)
+    }
+    showNewReport(first.report)
+    setLive(first)
+    if (first.state !== 'running' || !first.job) return
+    liveJob.current = first.job
+    let failures = 0
+    while (liveJob.current === first.job) {
+      await new Promise((r) => setTimeout(r, 1500))
+      if (liveJob.current !== first.job) return
+      try {
+        const next = await pollAnalysis(first.job)
+        if (liveJob.current !== first.job) return
+        failures = 0
+        setReport(next.report) // keeps the selected finding, statement and tab
+        setLive(next)
+        if (next.state !== 'running') liveJob.current = null
+      } catch (e) {
+        if (++failures >= 5) {
+          setError(`Lost contact with the backend while the AI was working: ${e.message}`)
+          liveJob.current = null
+        }
+      }
+    }
   }
   const openFile = (file) => loadWith(`Opening ${file.name}…`, () => readReportFile(file))
 
@@ -201,6 +232,7 @@ export default function App() {
         <DemoBanner
           report={report}
           onAnalyseWithAI={AI_AVAILABLE && lastFile && report?.instant ? () => uploadLog(lastFile) : null}
+          aiRunning={live?.state === 'running'}
         />
       )}
       {report && error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
@@ -209,7 +241,7 @@ export default function App() {
         busyMessage ? null : <EmptyState error={error} onUpload={handleLogFile} onShowHelp={() => setShowHelp(true)} />
       ) : (
         <div className="flex flex-col lg:min-h-0 lg:flex-1">
-          <ResultHeader report={report} stats={stats} trust={checks.trust} />
+          <ResultHeader report={report} stats={stats} trust={checks.trust} live={live} />
           <ResultTabs
             tab={tab}
             onChange={setTab}
@@ -235,6 +267,8 @@ export default function App() {
               jumpLine={jumpTarget?.line}
               existingLines={existingLines}
               instant={Boolean(report.instant)}
+              pending={live?.pending}
+              aiRunning={live?.state === 'running'}
             />
           </div>
           <div className="h-[75vh] bg-slate-900/40 lg:h-auto lg:min-h-0">
@@ -252,14 +286,14 @@ export default function App() {
               {tab === 'summary' && <SummaryTab report={report} stats={stats} onGoTo={setTab} />}
               {tab === 'scores' && <ScoresTab report={report} stats={stats} />}
               {tab === 'attackers' && <AttackersTab stats={stats} onOpenFinding={openFinding} />}
-              {tab === 'checks' && <ChecksTab report={report} onOpenFinding={openFinding} />}
+              {tab === 'checks' && <ChecksTab report={report} onOpenFinding={openFinding} pending={live?.pending} />}
               {tab === 'log' && <LogTab report={report} stats={stats} />}
             </main>
           )}
         </div>
       )}
 
-      {busyMessage && <BusyOverlay message={busyMessage} progress={progress} />}
+      {busyMessage && <BusyOverlay message={busyMessage} />}
       {showHelp && <HelpDialog onClose={() => setShowHelp(false)} />}
       {dragging && <DropOverlay />}
     </div>

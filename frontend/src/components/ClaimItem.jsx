@@ -8,7 +8,7 @@ const LINES_SHOWN = 8 // longer evidence lists are folded behind "show all"
 // Each cited line number ("L27") is its own button that jumps to that exact line.
 // Cited line numbers that don't exist in the log are flagged in red.
 // The claim and the line numbers are real <button>s, so Tab / Enter / Space work.
-export default function ClaimItem({ claim, selected, onSelect, onJumpToLine, jumpLine, existingLines }) {
+export default function ClaimItem({ claim, selected, onSelect, onJumpToLine, jumpLine, existingLines, pending }) {
   const ok = claim.verified
   const [showAll, setShowAll] = useState(false)
   const lines = showAll ? claim.evidence_lines : claim.evidence_lines.slice(0, LINES_SHOWN)
@@ -16,7 +16,9 @@ export default function ClaimItem({ claim, selected, onSelect, onJumpToLine, jum
   return (
     <li
       className={`rounded-lg border transition-colors ${
-        selected
+        pending
+          ? 'border-slate-700 bg-slate-900'
+          : selected
           ? ok
             ? 'border-emerald-500/70 bg-emerald-500/10'
             : 'border-red-500/70 bg-red-500/10'
@@ -33,18 +35,20 @@ export default function ClaimItem({ claim, selected, onSelect, onJumpToLine, jum
         className="flex w-full gap-3 rounded-lg px-4 pt-3 pb-1.5 text-left"
       >
         <span
-          aria-label={ok ? 'Proven by the log' : 'Not proven'}
-          title={ok ? 'Proven by the log' : 'Not proven'}
+          aria-label={pending ? 'Being checked' : ok ? 'Proven by the log' : 'Not proven'}
+          title={pending ? 'Being checked against the log' : ok ? 'Proven by the log' : 'Not proven'}
           className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-            ok ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'
+            pending ? 'animate-pulse bg-slate-700 text-slate-300' : ok ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'
           }`}
         >
-          {ok ? '✓' : '!'}
+          {pending ? '…' : ok ? '✓' : '!'}
         </span>
         <span className="min-w-0">
           <span className="block text-slate-100">{claim.text}</span>
 
-          {!ok && (
+          {pending && <span className="mt-1 block text-xs text-slate-400">Checking against the log…</span>}
+
+          {!ok && !pending && (
             <span className="mt-2 block rounded border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-sm text-red-200">
               <span className="font-semibold">Not proven, don’t rely on this. </span>
               {claim.verifier_note || 'No reason given.'}

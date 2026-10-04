@@ -14,7 +14,7 @@ const TONE = {
 
 // ResultHeader: the VirusTotal-style result card at the top. A ring with the
 // number of threats, a one-line verdict, and the file's key facts.
-export default function ResultHeader({ report, stats, trust }) {
+export default function ResultHeader({ report, stats, trust, live }) {
   const verdict = verdictFor(stats)
   const tone = TONE[verdict.tone]
   const n = report.alerts.length
@@ -36,7 +36,12 @@ export default function ResultHeader({ report, stats, trust }) {
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <p className={`text-2xl font-bold ${tone.text}`}>{verdict.text}</p>
-          {report.instant ? (
+          {live?.state === 'running' ? (
+            <span className="inline-flex items-center gap-2 rounded-full bg-emerald-500/15 px-3 py-1 text-sm font-medium text-emerald-200 ring-1 ring-emerald-500/40">
+              <span className="h-3 w-3 animate-spin rounded-full border-2 border-emerald-700 border-t-emerald-300" aria-hidden="true" />
+              AI is writing and checking statements…
+            </span>
+          ) : report.instant ? (
             <span className="inline-flex items-center rounded-full bg-sky-500/15 px-3 py-1 text-sm font-medium text-sky-200 ring-1 ring-sky-500/40">
               Instant scan · no AI · nothing uploaded
             </span>
@@ -56,8 +61,31 @@ export default function ResultHeader({ report, stats, trust }) {
           <Fact label="Scan type" value={report.instant ? 'Instant (rules only)' : 'AI + verified'} />
           <Fact label="Checked on" value={formatTime(report.meta.generated_at)} />
         </dl>
+        {live?.job && <LiveProgress live={live} claims={report.claims.length} />}
       </div>
     </section>
+  )
+}
+
+// Progress of a live AI analysis: findings written, statements still being checked, time so far.
+function LiveProgress({ live, claims }) {
+  const p = live.progress ?? {}
+  const steps = (p.alerts_total ?? 0) + claims
+  const done = (p.alerts_done ?? 0) + (claims - (p.claims_pending ?? 0))
+  const percent = live.state === 'running' ? (steps ? Math.round((done / steps) * 100) : 5) : 100
+  return (
+    <div className="mt-3" aria-live="polite">
+      <div className="h-1.5 overflow-hidden rounded-full bg-slate-800">
+        <div className="h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${percent}%` }} />
+      </div>
+      <p className="mt-1.5 text-xs text-slate-400">
+        {live.state === 'running'
+          ? `AI statements written for ${p.alerts_done ?? 0} of ${p.alerts_total ?? 0} findings · ${p.claims_pending ?? 0} being checked against the log · ${p.elapsed_seconds ?? 0}s`
+          : live.state === 'error'
+            ? 'The AI analysis stopped early; what was finished is shown.'
+            : `AI analysis finished in ${p.elapsed_seconds ?? 0}s. The findings above were shown instantly; the AI statements filled in as they were checked.`}
+      </p>
+    </div>
   )
 }
 

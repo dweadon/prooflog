@@ -3,15 +3,16 @@ import { Card } from './SummaryTab.jsx'
 
 // ChecksTab: every statement in one list with its verdict, filterable.
 // "Show proof" opens the finding with that statement selected.
-export default function ChecksTab({ report, onOpenFinding }) {
+export default function ChecksTab({ report, onOpenFinding, pending }) {
   const [filter, setFilter] = useState('all')
   const titleOf = new Map(report.alerts.map((a) => [a.id, a.title]))
-  const shown = report.claims.filter((c) => filter === 'all' || (filter === 'proven') === c.verified)
+  const isPending = (c) => Boolean(pending?.has(c.id))
+  const shown = report.claims.filter((c) => filter === 'all' || (!isPending(c) && (filter === 'proven') === c.verified))
   const proven = report.claims.filter((c) => c.verified).length
   const options = [
     ['all', `All (${report.claims.length})`],
     ['proven', `Proven (${proven})`],
-    ['unproven', `Not proven (${report.claims.length - proven})`],
+    ['unproven', `Not proven (${report.claims.filter((c) => !c.verified && !isPending(c)).length})`],
   ]
 
   return (
@@ -34,17 +35,17 @@ export default function ChecksTab({ report, onOpenFinding }) {
 
       <ul className="flex flex-col gap-2">
         {shown.map((c) => (
-          <li key={c.id} className={`rounded-xl border bg-slate-900 p-4 ${c.verified ? 'border-slate-800' : 'border-red-500/50'}`}>
+          <li key={c.id} className={`rounded-xl border bg-slate-900 p-4 ${c.verified || isPending(c) ? 'border-slate-800' : 'border-red-500/50'}`}>
             <div className="flex gap-3">
-              <span aria-label={c.verified ? 'Proven' : 'Not proven'}
-                className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm font-bold ${c.verified ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'}`}>
-                {c.verified ? '✓' : '!'}
+              <span aria-label={isPending(c) ? 'Being checked' : c.verified ? 'Proven' : 'Not proven'}
+                className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm font-bold ${isPending(c) ? 'animate-pulse bg-slate-700 text-slate-300' : c.verified ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'}`}>
+                {isPending(c) ? '…' : c.verified ? '✓' : '!'}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-xs text-slate-500">{titleOf.get(c.alert_id)}</p>
                 <p className="mt-0.5 text-slate-100">{c.text}</p>
-                <p className={`mt-1 text-sm ${c.verified ? 'text-emerald-300/90' : 'text-red-300'}`}>
-                  {c.verified ? '✓ Proven by the log' : `Not proven: ${c.verifier_note || 'no reason given.'}`}
+                <p className={`mt-1 text-sm ${isPending(c) ? 'text-slate-400' : c.verified ? 'text-emerald-300/90' : 'text-red-300'}`}>
+                  {isPending(c) ? 'Checking against the log…' : c.verified ? '✓ Proven by the log' : `Not proven: ${c.verifier_note || 'no reason given.'}`}
                 </p>
               </div>
               <button type="button" onClick={() => onOpenFinding(c.alert_id, c.id)}

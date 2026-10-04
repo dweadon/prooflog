@@ -43,7 +43,8 @@ async function errorDetail(res) {
 
 // Calls the backend and turns every kind of failure into a short message
 // a person can act on: backend down, timeout, HTTP error, or bad JSON.
-async function request(path, { messages = {}, timeoutMs, ...options } = {}) {
+// `parse` turns the JSON into what the caller needs (a checked report by default).
+async function request(path, { messages = {}, timeoutMs, parse = checkReport, ...options } = {}) {
   let res
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {
@@ -72,7 +73,7 @@ async function request(path, { messages = {}, timeoutMs, ...options } = {}) {
   } catch {
     throw new Error('The backend did not return valid JSON.')
   }
-  return checkReport(data)
+  return parse(data)
 }
 
 // GET /report: the most recent report the backend produced.
@@ -111,6 +112,44 @@ export function analyzeLog(file) {
   })
 }
 
+// A live job from the backend: the report so far, plus which statements are still being checked.
+function checkJob(body) {
+  if (!body || typeof body !== 'object' || !body.report) throw new Error('The backend sent an unexpected answer.')
+  return {
+    job: body.job ?? null,
+    state: body.state ?? 'done',
+    report: { ...checkReport(body.report), live: true },
+    pending: new Set(Array.isArray(body.pending_claims) ? body.pending_claims : []),
+    progress: body.progress ?? {},
+  }
+}
+
+// POST /analyze/start: uploads a log and gets the rule-based findings back at once.
+// The AI statements and verdicts then fill in: poll pollAnalysis(job).
+export function startAnalysis(file) {
+  if (!AI_AVAILABLE) {
+    return Promise.reject(new Error(
+      'This online demo only shows a saved report. To check your own log file, run ProofLog on your computer (see the GitHub page).'))
+  }
+  const form = new FormData()
+  form.append(UPLOAD_FIELD_NAME, file)
+  return request('/analyze/start', {
+    method: 'POST',
+    body: form,
+    timeoutMs: 3 * 60 * 1000, // only the upload and the rules; a sleeping free host may need a minute to wake
+    parse: checkJob,
+    messages: {
+      409: 'An analysis is already running. Wait a minute, then try again.',
+      413: 'That log file is too large for the backend.',
+    },
+  })
+}
+
+// GET /analyze/{job}: the live job so far.
+export function pollAnalysis(jobId) {
+  return request(`/analyze/${encodeURIComponent(jobId)}`, { timeoutMs: 20000, parse: checkJob })
+}
+
 // GET /status: the backend's progress while it analyzes, e.g.
 // { stage: "verifying", done: 4, total: 12, elapsed_seconds: 51 }.
 // Optional extra: returns null on any problem, so a backend without it still works.
@@ -131,5 +170,5 @@ export async function readReportFile(file) {
   } catch {
     throw new Error(`"${file.name}" is not valid JSON.`)
   }
-  return checkReport(data)
+  return parse(data)
 }

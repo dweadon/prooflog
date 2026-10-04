@@ -4,7 +4,7 @@ import { REPO_URL } from '../config.js'
 // the bundled example report, an instant in-browser scan of the visitor's own
 // file (with an "Analyse with AI" button when a hosted backend is configured),
 // or a full AI analysis that came back from that backend.
-export default function DemoBanner({ report, onAnalyseWithAI }) {
+export default function DemoBanner({ report, onAnalyseWithAI, aiRunning }) {
   const link = (
     <a href={REPO_URL} target="_blank" rel="noreferrer" className="font-medium text-sky-300 underline">
       run ProofLog yourself
@@ -13,7 +13,12 @@ export default function DemoBanner({ report, onAnalyseWithAI }) {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-sky-500/30 bg-sky-500/10 px-4 py-2 text-sm text-sky-100 sm:px-5">
       <p className="min-w-0 flex-1">
-        {report?.live && report.claims.length > 0 ? (
+        {report?.live && aiRunning ? (
+          <>
+            <strong>AI analysis running on the live ProofLog server.</strong> The findings are already here; AI statements
+            appear as they’re written, and each one turns ✓ or ✗ as it’s checked against your log.
+          </>
+        ) : report?.live && report.claims.length > 0 ? (
           <>
             <strong>Full AI analysis</strong> from the live ProofLog server: every AI statement was checked against your
             log, line by line.

@@ -7,7 +7,7 @@ import { ALERT_EXPLAINERS } from '../lib/plain.js'
 // AlertDetail: center panel. The selected alert's title, time range,
 // summary, and the AI's claims about it. Click a claim to see its proof.
 // Keyboard: ↑ / ↓ move between claims, Enter selects, Esc clears the selection.
-export default function AlertDetail({ alert, claims, selectedClaimId, onSelectClaim, onJumpToLine, jumpLine, existingLines, instant }) {
+export default function AlertDetail({ alert, claims, selectedClaimId, onSelectClaim, onJumpToLine, jumpLine, existingLines, instant, pending, aiRunning }) {
   if (!alert) {
     return <p className="p-6 text-slate-400">Pick a finding on the left to see what happened.</p>
   }
@@ -70,11 +70,17 @@ export default function AlertDetail({ alert, claims, selectedClaimId, onSelectCl
                 onJumpToLine={onJumpToLine}
                 jumpLine={jumpLine}
                 existingLines={existingLines}
+                pending={pending?.has(claim.id)}
               />
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-slate-400">The AI didn’t write about this one (it may have been skipped to save time). The summary above comes straight from the detection rules.</p>
+          aiRunning && !alert.summary.includes('AI analysis unavailable') && !alert.summary.includes('Not sent to AI') ? (
+            <p className="flex items-center gap-2 text-sm text-slate-400">
+              <span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-600 border-t-emerald-400" aria-hidden="true" />
+              The AI is writing statements about this finding…
+            </p>
+          ) : <p className="text-sm text-slate-400">The AI didn’t write about this one (it may have been skipped to save time). The summary above comes straight from the detection rules.</p>
         )}
       </section>
     </article>
