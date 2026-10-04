@@ -32,7 +32,7 @@ export default function BusyOverlay({ message, progress }) {
         )}
         {progress && (
           <p className="mt-3 text-xs text-slate-400">
-            {progress.seconds}s so far. This usually takes a few minutes, so feel free to grab a coffee.
+            {progress.seconds}s so far. This usually takes about a minute (a little longer if the server was asleep).
           </p>
         )}
       </div>

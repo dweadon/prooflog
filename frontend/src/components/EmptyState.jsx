@@ -29,7 +29,7 @@ export default function EmptyState({ error, onUpload, onShowHelp }) {
           </button>
         </div>
         <p className="mt-4 text-sm text-slate-400">
-          On Linux the file is usually <code className="text-slate-300">/var/log/auth.log</code>. Checking takes a few minutes.
+          On Linux the file is usually <code className="text-slate-300">/var/log/auth.log</code>. Checking takes about a minute.
         </p>
       </div>
     </div>

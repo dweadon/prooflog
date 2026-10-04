@@ -42,7 +42,7 @@ export default function DemoBanner({ report, onAnalyseWithAI }) {
         <button
           type="button"
           onClick={onAnalyseWithAI}
-          title="Uploads this file to the ProofLog server for AI analysis. Takes a few minutes."
+          title="Uploads this file to the ProofLog server for AI analysis. Takes about a minute."
           className="shrink-0 rounded-md bg-emerald-600 px-3 py-1.5 font-medium text-white hover:bg-emerald-500"
         >
           Analyse with AI →

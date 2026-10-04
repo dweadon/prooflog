@@ -1,7 +1,8 @@
 import { AI_AVAILABLE, API_BASE_URL, DEMO_MODE, UPLOAD_FIELD_NAME } from './config.js'
 
 // How long to wait for the AI analysis before giving up.
-// A 2,000-line log took about 3 minutes on the real backend, so leave plenty of room.
+// A 2,000-line log takes about 1 minute on the live backend; a sleeping free host adds
+// about a minute more, so leave plenty of room.
 const ANALYZE_TIMEOUT_MS = 10 * 60 * 1000
 
 // Checks that a report has the shape the dashboard needs, and fills in

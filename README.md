@@ -1,6 +1,10 @@
 # ProofLog: AI security analysis you can audit
 
-**Live demo:** https://dweadon.github.io/prooflog/ (the dashboard showing a real report from the public Loghub OpenSSH log; to analyse your own logs, run it locally as below)
+**Live app (with AI):** https://prooflog.onrender.com — drop a log file and get the full AI analysis, with every statement checked against your log.
+
+**Demo site:** https://dweadon.github.io/prooflog/ — a real example report plus an instant in-browser scan of any log you drop in; its “Analyse with AI” button sends the file to the live app.
+
+The live app runs on Render's free plan: if nobody has used it for a while, the first visit can take about a minute to wake it up.
 
 ProofLog reads a real server login log, finds suspicious activity (brute force, password spraying, logins after many failures, logins at odd hours) and writes a plain-English incident report.
 
@@ -101,7 +105,8 @@ If both are set, Anthropic is used unless `PROOFLOG_PROVIDER=groq`. `GET /` show
 
 **Groq notes:**
 - The default model is `openai/gpt-oss-120b`, which supports strict JSON-schema output. If a model doesn't support it, ProofLog falls back to JSON mode and still validates the shape itself.
-- Groq's free tier allows about **8,000 tokens per minute**, so Groq defaults are smaller: 6 alerts to the AI, 40 evidence lines per alert, 2 calls at once, and a 420 s time budget. Rate-limited calls are retried automatically.
+- Groq's free tier allows about **8,000 tokens per minute**, so Groq defaults are smaller: 6 alerts to the AI, 30 evidence lines per alert, 3 calls at once, and a 420 s time budget. Rate-limited calls are retried automatically.
+- Groq counts that allowance **per model**, so the verifier runs on its own smaller, faster model (`openai/gpt-oss-20b`; change it with `PROOFLOG_VERIFY_MODEL`). With short thinking (`PROOFLOG_CLAIMS_EFFORT=low`) and small output limits, a full analysis of the example log takes about 1–2 minutes.
 - On a paid Groq tier, raise `PROOFLOG_MAX_AI_ALERTS`, `PROOFLOG_MAX_LINES` and `PROOFLOG_PARALLEL_CALLS`.
 
 Optional settings (environment variables):
@@ -110,11 +115,12 @@ Optional settings (environment variables):
 |---|---|---|
 | `PROOFLOG_PROVIDER` | from the key | `groq` or `anthropic` |
 | `PROOFLOG_MODEL` | `claude-opus-5` / `openai/gpt-oss-120b` | Model used for claims and checks |
-| `PROOFLOG_CLAIMS_EFFORT` | `medium` | How hard the model thinks when writing claims (`low`…`max`) |
+| `PROOFLOG_CLAIMS_EFFORT` | `medium` / Groq `low` | How hard the model thinks when writing claims (`low`…`max`) |
 | `PROOFLOG_VERIFY_EFFORT` | `low` | Same, for the yes/no verifier check |
+| `PROOFLOG_VERIFY_MODEL` | same as `PROOFLOG_MODEL` / Groq `openai/gpt-oss-20b` | Model used by the verifier's AI check |
 | `PROOFLOG_MAX_AI_ALERTS` | `15` / Groq `6` | Most severe alerts sent to the AI |
-| `PROOFLOG_MAX_LINES` | `300` / Groq `40` | Evidence lines shown to the AI per alert |
-| `PROOFLOG_PARALLEL_CALLS` | `8` / Groq `2` | AI calls running at once |
+| `PROOFLOG_MAX_LINES` | `300` / Groq `30` | Evidence lines shown to the AI per alert |
+| `PROOFLOG_PARALLEL_CALLS` | `8` / Groq `3` | AI calls running at once |
 | `PROOFLOG_TIME_BUDGET` | `240` / Groq `420` | Seconds an analysis may take. AI work still pending after that is skipped and explained. |
 | `PROOFLOG_DEBUG_INJECT` | off | `1` = always inject the demo false claim (see Stage 4) |
 | `PROOFLOG_REPORT_PATH` | `reports/latest.json` | Where the latest report is saved |
