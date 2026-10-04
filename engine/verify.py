@@ -25,7 +25,8 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
-from .claims import PARALLEL_CALLS, AIError, call_ai, escape_log_text, make_client, out_of_time, write_claims
+from .claims import (PARALLEL_CALLS, AIError, call_ai, escape_log_text, make_client, out_of_time,
+                     with_rate_limit_retry, write_claims)
 from . import progress
 from .detect import format_ranges, run_detections
 from .parser import parse_file
@@ -219,13 +220,14 @@ def build_verify_prompt(claim: Claim, cited: list[ParsedLine]) -> str:
 
 
 # Check 3: asks the AI whether the cited lines support the claim. Returns (supported, reason).
-# Retries once on invalid JSON. Raises AIError if the AI can't be reached.
-def ai_check(client, claim: Claim, cited: list[ParsedLine]) -> tuple[bool, str]:
+# Retries once on invalid JSON, and waits out rate limits. Raises AIError if the AI can't be reached.
+def ai_check(client, claim: Claim, cited: list[ParsedLine], deadline: float | None = None) -> tuple[bool, str]:
     prompt = build_verify_prompt(claim, cited)
     for _attempt in range(2):
         try:
-            data = json.loads(call_ai(client, prompt, system=VERIFIER_PROMPT,
-                                      schema=VERIFIER_SCHEMA, effort=VERIFY_EFFORT))
+            data = json.loads(with_rate_limit_retry(
+                lambda: call_ai(client, prompt, system=VERIFIER_PROMPT, schema=VERIFIER_SCHEMA, effort=VERIFY_EFFORT),
+                deadline))
             verdict, reason = data["verdict"], str(data["reason"]).strip()
             if verdict in ("supported", "not supported"):
                 return verdict == "supported", reason or "(no reason given)"
@@ -268,7 +270,7 @@ def verify_claim(claim: Claim, lines_by_number: dict[int, ParsedLine], all_usern
         claim.verifier_note = f"Cites {len(cited)} lines, too many to check (max {MAX_VERIFY_LINES})."
         return
     try:
-        supported, reason = ai_check(client, claim, cited)
+        supported, reason = ai_check(client, claim, cited, deadline)
     except AIError as e:
         claim.verifier_note = f"Code checks passed, but the AI check failed: {e}"
         return

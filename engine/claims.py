@@ -108,6 +108,28 @@ class AIError(Exception):
     """Raised when the AI call fails in a way we report instead of crashing."""
 
 
+class RateLimitedError(AIError):
+    """The AI provider said "too many requests"; waiting a little usually fixes it."""
+
+
+RATE_LIMIT_WAIT_SECONDS = 20  # pause before retrying a rate-limited call
+RATE_LIMIT_RETRIES = 3        # extra tries after a rate limit (within the time budget)
+
+
+# Runs one AI call, and if the provider rate-limits it, waits and tries again
+# (up to RATE_LIMIT_RETRIES times) as long as the report's time budget allows.
+# Groq's free tier allows only ~8,000 tokens a minute, so short waits are normal.
+def with_rate_limit_retry(call, deadline: float | None = None):
+    for attempt in range(RATE_LIMIT_RETRIES + 1):
+        try:
+            return call()
+        except RateLimitedError:
+            waited_out = deadline is not None and time.monotonic() + RATE_LIMIT_WAIT_SECONDS > deadline
+            if attempt == RATE_LIMIT_RETRIES or waited_out:
+                raise
+            time.sleep(RATE_LIMIT_WAIT_SECONDS)
+
+
 @dataclass
 class AlertAnalysis:
     """What the AI wrote for one alert, or the error explaining why it couldn't."""
@@ -222,7 +244,7 @@ def call_ai(client, prompt: str, system: str = SYSTEM_PROMPT,
     except anthropic.AuthenticationError:
         raise AIError("The Anthropic API key was rejected.")
     except anthropic.RateLimitError:
-        raise AIError("Rate limited by the Anthropic API. Try again shortly.")
+        raise RateLimitedError("Rate limited by the Anthropic API. Try again shortly.")
     except anthropic.BadRequestError as e:
         raise AIError(f"Anthropic API rejected the request: {e.message}")
     except anthropic.APIStatusError as e:
@@ -269,7 +291,7 @@ def call_groq(client, prompt: str, system: str, schema: dict, effort: str) -> st
     except groq.AuthenticationError:
         raise AIError("The Groq API key was rejected.")
     except groq.RateLimitError:
-        raise AIError("Rate limited by Groq (the free tier allows about 8,000 tokens per minute). "
+        raise RateLimitedError("Rate limited by Groq (the free tier allows about 8,000 tokens per minute). "
                       "Lower PROOFLOG_MAX_AI_ALERTS or wait a minute.")
     except groq.BadRequestError as e:
         raise AIError(f"Groq rejected the request: {e.message}")
@@ -296,7 +318,7 @@ def analyze_alert(client, alert: Alert, lines_by_number: dict[int, ParsedLine],
         if out_of_time(deadline):
             return AlertAnalysis(alert.id, error="Skipped: the report's time budget ran out.")
         try:
-            summary, claims = validate_output(call_ai(client, prompt))
+            summary, claims = validate_output(with_rate_limit_retry(lambda: call_ai(client, prompt), deadline))
             return AlertAnalysis(alert.id, summary=summary, claims=claims)
         except AIError as e:
             return AlertAnalysis(alert.id, error=str(e))  # API problems: retrying the same way won't help

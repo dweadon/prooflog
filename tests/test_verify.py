@@ -125,6 +125,33 @@ class VerifierTests(unittest.TestCase):
         self.assertFalse(c.verified)
         self.assertIn("AI check failed", c.verifier_note)
 
+    def test_rate_limit_is_waited_out_then_verified(self):
+        from engine import claims as claims_mod
+        from engine.claims import RateLimitedError
+        client = FakeClient([{}])
+        calls = {"n": 0}
+        original = client._create
+
+        def flaky(**kw):  # the first verifier call is rate-limited, the retry succeeds
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise RateLimitedError("Rate limited")
+            return original(**kw)
+        client.beta.messages.create = flaky
+        with mock.patch.object(claims_mod.time, "sleep") as slept:
+            c = self.check("203.0.113.45 failed to log in.", BRUTE, client=client)
+        self.assertTrue(c.verified, c.verifier_note)
+        slept.assert_called_once_with(claims_mod.RATE_LIMIT_WAIT_SECONDS)
+
+    def test_rate_limit_gives_up_after_retries(self):
+        from engine import claims as claims_mod
+        from engine.claims import RateLimitedError
+        c_client = FakeClient([{}], verdict=RateLimitedError("Rate limited by Groq"))
+        with mock.patch.object(claims_mod.time, "sleep"):
+            c = self.check("203.0.113.45 failed to log in.", BRUTE, client=c_client)
+        self.assertFalse(c.verified)
+        self.assertIn("Rate limited", c.verifier_note)
+
     def test_missing_key_means_unverified(self):
         claim = Claim(id=1, alert_id=1, text="203.0.113.45 failed to log in.", evidence_lines=BRUTE)
         with mock.patch.dict(os.environ, {"ANTHROPIC_API_KEY": ""}):

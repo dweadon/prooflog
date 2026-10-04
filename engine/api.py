@@ -69,7 +69,8 @@ def cache_path(data: bytes, filename: str, source_type: str, year, inject: bool)
 @app.get("/health")
 def health():
     key = "GROQ_API_KEY" if PROVIDER == "groq" else "ANTHROPIC_API_KEY"
-    return {"status": "ok", "provider": PROVIDER, "model": MODEL, "ai_key_set": bool(os.environ.get(key))}
+    return {"status": "ok", "provider": PROVIDER, "model": MODEL, "ai_key_set": bool(os.environ.get(key)),
+            "version": os.environ.get("RENDER_GIT_COMMIT", "local")[:7]}  # Render sets the deployed commit
 
 
 # Accepts an uploaded log file, runs the whole pipeline, saves and returns report.json.
