@@ -12,3 +12,8 @@ export const API_BASE_URL =
 // Name of the multipart form field the log file is sent in (POST /analyze).
 // Must match the backend, e.g. FastAPI `file: UploadFile` -> 'file'.
 export const UPLOAD_FIELD_NAME = import.meta.env.VITE_UPLOAD_FIELD_NAME || 'file'
+
+// Online demo build (GitHub Pages): there's no backend, so the dashboard shows a
+// real report bundled with the site instead. Build with VITE_DEMO=1.
+export const DEMO_MODE = import.meta.env.VITE_DEMO === '1'
+export const REPO_URL = 'https://github.com/dweadon/prooflog'

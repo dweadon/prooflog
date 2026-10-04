@@ -14,6 +14,8 @@ import BusyOverlay from './components/BusyOverlay.jsx'
 import PrintReport from './components/PrintReport.jsx'
 import SummaryBanner from './components/SummaryBanner.jsx'
 import HelpDialog from './components/HelpDialog.jsx'
+import DemoBanner from './components/DemoBanner.jsx'
+import { DEMO_MODE } from './config.js'
 
 // App: holds the current report and what's selected, and lays out the
 // dashboard: alerts (left), alert details + claims (center), log (right).
@@ -120,6 +122,7 @@ export default function App() {
         }
       />
 
+      {DEMO_MODE && <DemoBanner />}
       {report && error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       {checks && <ReportChecks warnings={checks.warnings} />}
       {report && <SummaryBanner report={report} trust={checks.trust} onShowHelp={() => setShowHelp(true)} />}

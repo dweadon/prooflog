@@ -1,4 +1,4 @@
-import { API_BASE_URL, UPLOAD_FIELD_NAME } from './config.js'
+import { API_BASE_URL, DEMO_MODE, UPLOAD_FIELD_NAME } from './config.js'
 
 // How long to wait for the AI analysis before giving up.
 // A 2,000-line log took about 3 minutes on the real backend, so leave plenty of room.
@@ -75,7 +75,9 @@ async function request(path, { messages = {}, timeoutMs, ...options } = {}) {
 }
 
 // GET /report: the most recent report the backend produced.
+// In the online demo there's no backend, so it loads the bundled real report instead.
 export function fetchLatestReport() {
+  if (DEMO_MODE) return request(`${import.meta.env.BASE_URL}demo-report.json`)
   return request('/report', {
     messages: { 404: 'The backend has no report yet. Upload a log to create one.' },
   })
@@ -83,6 +85,10 @@ export function fetchLatestReport() {
 
 // POST /analyze: sends a log file (multipart form field "file") and gets back a report.
 export function analyzeLog(file) {
+  if (DEMO_MODE) {
+    return Promise.reject(new Error(
+      'This online demo only shows a saved report. To check your own log file, run ProofLog on your computer (see the GitHub page).'))
+  }
   const form = new FormData()
   form.append(UPLOAD_FIELD_NAME, file)
   const wrongFormat =
