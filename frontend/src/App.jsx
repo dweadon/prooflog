@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { analyzeLog, fetchLatestReport, fetchStatus, readReportFile } from './api.js'
 import { sortBySeverity } from './lib/severity.js'
 import { checkReportIntegrity } from './lib/reportChecks.js'
@@ -15,6 +15,7 @@ import PrintReport from './components/PrintReport.jsx'
 import SummaryBanner from './components/SummaryBanner.jsx'
 import HelpDialog from './components/HelpDialog.jsx'
 import DemoBanner from './components/DemoBanner.jsx'
+import Landing from './components/Landing.jsx'
 import { DEMO_MODE } from './config.js'
 
 // App: holds the current report and what's selected, and lays out the
@@ -31,6 +32,7 @@ export default function App() {
   const [jumpTarget, setJumpTarget] = useState(null)
   const [showPrint, setShowPrint] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
+  const [view, setView] = useState('landing') // 'landing' first, then 'dashboard'
   const [progress, setProgress] = useState(null) // backend progress while a log is being checked
 
   // Shared by every way of getting a report: show a busy message,
@@ -69,11 +71,16 @@ export default function App() {
   }
   const openFile = (file) => loadWith(`Opening ${file.name}…`, () => readReportFile(file))
 
-  // Try to show the backend's latest report on startup.
-  // A "no report yet" error here is normal, so it's shown quietly in the empty state.
-  useEffect(() => {
-    loadLatest()
-  }, [loadLatest])
+  // From the landing page: open the report (the example online, the last result locally),
+  // or check a new log file. Either way we switch to the dashboard.
+  const openReportFromLanding = () => {
+    setView('dashboard')
+    if (!report) loadLatest()
+  }
+  const uploadFromLanding = (file) => {
+    setView('dashboard')
+    uploadLog(file)
+  }
 
   const selectAlert = (id) => {
     setSelectedAlertId(id)
@@ -100,6 +107,15 @@ export default function App() {
   const alertClaims = report?.claims.filter((c) => c.alert_id === selectedAlertId) ?? []
   const selectedClaim = alertClaims.find((c) => c.id === selectedClaimId) ?? null
 
+  if (view === 'landing') {
+    return (
+      <>
+        <Landing onOpenReport={openReportFromLanding} onUpload={uploadFromLanding} onShowHelp={() => setShowHelp(true)} />
+        {showHelp && <HelpDialog onClose={() => setShowHelp(false)} />}
+      </>
+    )
+  }
+
   if (showPrint && report) {
     return <PrintReport report={report} trust={checks.trust} warnings={checks.warnings} onClose={() => setShowPrint(false)} />
   }
@@ -110,6 +126,7 @@ export default function App() {
         report={report}
         trust={checks?.trust}
         onShowHelp={() => setShowHelp(true)}
+        onHome={() => setView('landing')}
         actions={
           <Toolbar
             busy={Boolean(busyMessage)}

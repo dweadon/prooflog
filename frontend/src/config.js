@@ -17,3 +17,9 @@ export const UPLOAD_FIELD_NAME = import.meta.env.VITE_UPLOAD_FIELD_NAME || 'file
 // real report bundled with the site instead. Build with VITE_DEMO=1.
 export const DEMO_MODE = import.meta.env.VITE_DEMO === '1'
 export const REPO_URL = 'https://github.com/dweadon/prooflog'
+
+// The real example log the demo report was made from. The online demo serves
+// its own copy (so "download" works); locally it comes from the GitHub repo.
+export const EXAMPLE_LOG_URL = DEMO_MODE
+  ? `${import.meta.env.BASE_URL}OpenSSH_2k.log`
+  : `${REPO_URL}/raw/main/examples/OpenSSH_2k.log`

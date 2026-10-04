@@ -4,14 +4,16 @@ import { formatTime } from '../lib/format.js'
 // Header: product name and action buttons on top; below that (once a report is
 // loaded) where the log came from, when the report was made, and the trust score.
 // `trust` is recounted from the claims by the dashboard, not copied from the backend.
-export default function Header({ report, trust, actions, onShowHelp }) {
+export default function Header({ report, trust, actions, onShowHelp, onHome }) {
   const meta = report?.meta
   return (
     <header className="border-b border-slate-800 bg-slate-900/80 px-4 py-3 sm:px-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-baseline gap-3">
           <h1 className="text-lg font-semibold tracking-tight text-white">
-            Proof<span className="text-emerald-400">Log</span>
+            <button type="button" onClick={onHome} title="Back to the start page" className="rounded hover:opacity-80">
+              Proof<span className="text-emerald-400">Log</span>
+            </button>
           </h1>
           <span className="hidden text-xs text-slate-400 sm:inline">AI security checks you can verify</span>
         </div>
