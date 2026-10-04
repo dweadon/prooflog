@@ -1,7 +1,7 @@
 """Pre-demo check: runs the REAL AI on the smallest alert only (a few cents,
 about a minute) to prove the API accepts our requests before the full run.
 
-Run:  python -m engine.smoke [data/OpenSSH_2k.log]     (needs ANTHROPIC_API_KEY or GROQ_API_KEY)
+Run:  python -m engine.smoke [examples/OpenSSH_2k.log]     (needs ANTHROPIC_API_KEY or GROQ_API_KEY)
 Prints PASS or FAIL, and estimates how long a full analysis will take.
 """
 from __future__ import annotations
@@ -25,7 +25,7 @@ def report_step(ok: bool, message: str) -> bool:
 
 # Runs the check and returns the exit code: 0 = ready for the demo, 1 = something's wrong.
 def main() -> int:
-    path = sys.argv[1] if len(sys.argv) > 1 else "data/OpenSSH_2k.log"
+    path = sys.argv[1] if len(sys.argv) > 1 else "examples/OpenSSH_2k.log"
     print(f"ProofLog smoke test: {path}, provider {PROVIDER}, model {MODEL}\n")
 
     try:

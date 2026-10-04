@@ -1,5 +1,4 @@
-"""Checks against the real Loghub OpenSSH_2k.log (skipped if it isn't downloaded).
-Download: see README "Get a real log". Run: python -m unittest -v"""
+"""Checks against the real Loghub OpenSSH_2k.log bundled in examples/. Run: python -m unittest -v"""
 import unittest
 from collections import Counter
 from pathlib import Path
@@ -7,10 +6,10 @@ from pathlib import Path
 from engine.detect import run_detections
 from engine.parser import HEADER, parse_file
 
-REAL = Path(__file__).resolve().parent.parent / "data" / "OpenSSH_2k.log"
+REAL = Path(__file__).resolve().parent.parent / "examples" / "OpenSSH_2k.log"
 
 
-@unittest.skipUnless(REAL.exists(), "data/OpenSSH_2k.log not downloaded")
+@unittest.skipUnless(REAL.exists(), "examples/OpenSSH_2k.log missing")
 class RealLoghubTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

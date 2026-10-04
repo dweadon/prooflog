@@ -25,22 +25,21 @@ pip install -r requirements.txt
 # 2. Dashboard (Node.js 18+)
 cd frontend && npm install && npm run build && cd ..
 
-# 3. Real log to analyse (public Loghub dataset)
-mkdir -p data && curl -L -o data/OpenSSH_2k.log https://raw.githubusercontent.com/logpai/loghub/master/OpenSSH/OpenSSH_2k.log
-
-# 4. Run: set ONE key, then open http://localhost:8000
+# 3. Run: set ONE key, then open http://localhost:8000
 export GROQ_API_KEY="gsk_..."          # or: export ANTHROPIC_API_KEY="sk-ant-..."
 uvicorn engine.api:app --host 127.0.0.1 --port 8000
 ```
 
 Run the tests with `python -m unittest -v` (no API key needed).
 
+**Example log:** `examples/OpenSSH_2k.log` is a real 2,000-line SSH log from a server under attack (from Loghub; see `examples/README.md`). Upload it with **Check a log file**, or run `python -m engine.detect examples/OpenSSH_2k.log`.
+
 ## Credits and open-source used
 
 ProofLog's own code is in `engine/`, `tests/` and `frontend/src/`. It builds on these open-source projects, datasets and services:
 
 **Data**
-- **[Loghub](https://github.com/logpai/loghub)**: the `OpenSSH_2k.log` sample used for the demo and tests. It is real SSH logs from a server under attack, published by the LogPAI team. *Jieming Zhu, Shilin He, Pinjia He, Jinyang Liu, Michael R. Lyu. "Loghub: A Large Collection of System Log Datasets for AI-driven Log Analytics." IEEE ISSRE, 2023.* It isn't copied into this repo; the command above downloads it.
+- **[Loghub](https://github.com/logpai/loghub)**: the `OpenSSH_2k.log` sample used for the demo and tests. It is real SSH logs from a server under attack, published by the LogPAI team. *Jieming Zhu, Shilin He, Pinjia He, Jinyang Liu, Michael R. Lyu. "Loghub: A Large Collection of System Log Datasets for AI-driven Log Analytics." IEEE ISSRE, 2023.* An unmodified copy is in `examples/`, distributed under Loghub's terms (free for research and academic work, with this reference).
 
 **Backend (Python)**
 - [FastAPI](https://github.com/fastapi/fastapi) (MIT) and [Uvicorn](https://github.com/encode/uvicorn) (BSD-3-Clause): web server and API
@@ -107,13 +106,7 @@ Without a key, everything still runs. Alerts keep their code-written summaries, 
 
 ## Get a real log
 
-ProofLog runs on real logs. For the demo, use the public Loghub SSH dataset:
-
-```bash
-mkdir -p data
-curl -L -o data/OpenSSH_2k.log https://raw.githubusercontent.com/logpai/loghub/master/OpenSSH/OpenSSH_2k.log
-```
-
+ProofLog runs on real logs. The repo includes one: `examples/OpenSSH_2k.log` from the public Loghub dataset (see `examples/README.md` for credit).
 It's 2,000 real lines from a server under attack, giving 12 alerts (brute force and password spraying). You can also use your own server's `/var/log/auth.log` (reading it usually needs `sudo`).
 
 Syslog lines have no year. By default ProofLog uses the most recent year that doesn't put the log in the future, so a "Dec 10" log analysed in October is dated last December. Pass `--year` (CLI) or `year` (API) to set it yourself.
@@ -153,8 +146,8 @@ uvicorn engine.api:app --host 127.0.0.1 --port 8000
 | `GET /status` | Progress of the running analysis, for the dashboard's loading screen: `{"stage": "idle\|parsing\|writing_claims\|verifying\|done\|error", "done": 18, "total": 40, "elapsed_seconds": 95}` |
 
 ```bash
-curl -F file=@data/OpenSSH_2k.log http://127.0.0.1:8000/analyze
-curl -F file=@data/OpenSSH_2k.log -F debug_inject_false_claim=true http://127.0.0.1:8000/analyze
+curl -F file=@examples/OpenSSH_2k.log http://127.0.0.1:8000/analyze
+curl -F file=@examples/OpenSSH_2k.log -F debug_inject_false_claim=true http://127.0.0.1:8000/analyze
 curl http://127.0.0.1:8000/report
 ```
 
@@ -171,7 +164,7 @@ If the AI fails for some alerts, the report is still returned. The `X-ProofLog-A
 
 ## Test each stage
 
-The whole suite (78 tests) uses a fake AI client, so it needs no key and costs nothing. `tests/test_real_loghub.py` also checks the real Loghub file when it's in `data/` (and is skipped otherwise):
+The whole suite (78 tests) uses a fake AI client, so it needs no key and costs nothing. `tests/test_real_loghub.py` also checks the real example log in `examples/`:
 
 ```bash
 python -m unittest -v
@@ -181,10 +174,10 @@ python -m unittest -v
 
 | Stage | Try it on a real log | What to look for |
 |---|---|---|
-| 1 Parser | `python -m engine.parser data/OpenSSH_2k.log` | First 10 lines: line number, time, event, IP, username, untrusted fields. Add `--json` for contract `log_lines`. |
-| 2 Detection | `python -m engine.detect data/OpenSSH_2k.log` | Alerts with severity and the exact lines that triggered each. Add `--json` for contract `alerts`. |
-| 3 Claims | `python -m engine.claims data/OpenSSH_2k.log` | AI summary and 2–4 claims per alert, each citing lines. Needs the key. |
-| 4 Verifier | `python -m engine.verify data/OpenSSH_2k.log --inject-false-claim` | Each claim marked VERIFIED/UNVERIFIED with a note. The injected claim must be UNVERIFIED. Needs the key. |
+| 1 Parser | `python -m engine.parser examples/OpenSSH_2k.log` | First 10 lines: line number, time, event, IP, username, untrusted fields. Add `--json` for contract `log_lines`. |
+| 2 Detection | `python -m engine.detect examples/OpenSSH_2k.log` | Alerts with severity and the exact lines that triggered each. Add `--json` for contract `alerts`. |
+| 3 Claims | `python -m engine.claims examples/OpenSSH_2k.log` | AI summary and 2–4 claims per alert, each citing lines. Needs the key. |
+| 4 Verifier | `python -m engine.verify examples/OpenSSH_2k.log --inject-false-claim` | Each claim marked VERIFIED/UNVERIFIED with a note. The injected claim must be UNVERIFIED. Needs the key. |
 | 5 API | Run the server, then use the `curl` commands above | Contract-shaped JSON; `/report` returns the same report after a restart. |
 
 ## Layout
